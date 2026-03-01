@@ -1,0 +1,413 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{{ title }} | SRA Admin{% endblock %}
+
+{% block branding %}
+<a href="{% url 'admin:index' %}" style="display:flex;align-items:center;gap:14px;text-decoration:none;">
+  <img src="{% static 'img/sra-logo.png' %}" alt="SRA Logo"
+       style="height:46px;width:46px;border-radius:50%;object-fit:cover;
+              border:2px solid #c9a84c;box-shadow:0 0 10px rgba(201,168,76,0.4);" />
+  <div style="line-height:1.25;">
+    <div style="color:#fff;font-size:1.15rem;font-weight:800;letter-spacing:0.03em;
+                font-family:'Segoe UI',sans-serif;">
+      Spirit Revival Africa
+    </div>
+    <div style="color:#c9a84c;font-size:0.62rem;font-weight:500;
+                letter-spacing:0.12em;text-transform:uppercase;opacity:0.9;">
+      Administration Portal
+    </div>
+  </div>
+</a>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  /* ── Palette ─────────────────────────────────────────────── */
+  :root {
+    --gold:     #c9a84c;
+    --gold-lt:  #e8c96a;
+    --maroon:   #6b1a1a;
+    --maroon2:  #8b2020;
+    --bg:       #1c1c1c;
+    --bg2:      #242424;
+    --bg3:      #2e2e2e;
+    --border:   #3a3a3a;
+    --text:     #e8e8e8;
+    --text-dim: #999;
+  }
+
+  /* ── Base & body ─────────────────────────────────────────── */
+  body {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    font-family: 'Segoe UI', system-ui, sans-serif !important;
+  }
+
+  /* ── Header ──────────────────────────────────────────────── */
+  #header {
+    background: linear-gradient(90deg, #1a0a0a 0%, var(--maroon) 60%, #2a1010 100%) !important;
+    border-bottom: 2px solid var(--gold) !important;
+    padding: 10px 24px !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+  #user-tools, #user-tools a, #user-tools a:visited {
+    color: #ddd !important;
+  }
+  #user-tools a { border-bottom: 1px solid var(--gold) !important; }
+  #user-tools a:hover { color: var(--gold) !important; }
+
+  /* ── Breadcrumbs ─────────────────────────────────────────── */
+  div.breadcrumbs {
+    background: var(--bg2) !important;
+    color: var(--text-dim) !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  div.breadcrumbs a { color: var(--gold) !important; }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  #nav-sidebar { background: var(--bg2) !important; border-right: 1px solid var(--border) !important; }
+  #nav-sidebar .module {
+    background: transparent !important;
+    border: none !important;
+  }
+  #nav-sidebar .module caption {
+    background: var(--maroon) !important;
+    color: var(--gold) !important;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+  }
+  #nav-sidebar a { color: #ccc !important; font-size: 0.88rem; }
+  #nav-sidebar a:hover { color: var(--gold) !important; padding-left: 4px; }
+
+  /* ── Content area ────────────────────────────────────────── */
+  #content { background: var(--bg) !important; }
+  #content h1 { color: var(--text) !important; font-weight: 700; }
+
+  /* ── Module boxes ────────────────────────────────────────── */
+  .module {
+    background: var(--bg2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .module h2, .module caption, .inline-group h2 {
+    background: linear-gradient(90deg, var(--maroon), #3a1414) !important;
+    color: var(--gold) !important;
+    border-left: 3px solid var(--gold-lt) !important;
+    padding: 7px 12px !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .module table { background: transparent !important; }
+  .module th   { background: var(--bg3) !important; color: var(--gold) !important; font-size: 0.78rem; }
+  .module td   { color: var(--text) !important; border-color: var(--border) !important; }
+
+  /* ── Dashboard app index ─────────────────────────────────── */
+  #content-main .app-accounts   .model-user a::before       { content: "👤 "; }
+  #content-main .app-prayer     .model-prayerrequest a::before { content: "🙏 "; }
+  #content-main .app-hubs       .model-revivalhub a::before  { content: "🏛 "; }
+  #content-main .app-groups     .model-revivalgroup a::before { content: "👥 "; }
+  #content-main .app-discipleship .model-course a::before    { content: "📖 "; }
+  #content-main .app-content    .model-contentitem a::before { content: "📄 "; }
+  #content-main .app-messaging  .model-directmessage a::before { content: "💬 "; }
+  #content-main .app-common     .model-auditlog a::before    { content: "🔍 "; }
+
+  /* ── Result table ────────────────────────────────────────── */
+  #result_list { border-collapse: collapse; }
+  #result_list thead th {
+    background: linear-gradient(90deg, var(--maroon), #3a1414) !important;
+    color: var(--gold) !important;
+    border-color: var(--border) !important;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+  }
+  #result_list tbody td { border-color: var(--border) !important; color: var(--text) !important; }
+  #result_list tbody tr:hover td { background: #2a1818 !important; }
+  #result_list tbody tr.selected td { background: #3a2020 !important; }
+
+  /* ── Changelist filters ──────────────────────────────────── */
+  #changelist-filter {
+    background: var(--bg2) !important;
+    border-left: 1px solid var(--border) !important;
+  }
+  #changelist-filter h2 {
+    background: var(--maroon) !important;
+    color: var(--gold) !important;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
+  #changelist-filter h3 { color: var(--gold) !important; font-size: 0.75rem; }
+  #changelist-filter li.selected a { color: var(--gold) !important; font-weight: 700; }
+  #changelist-filter a { color: #bbb !important; }
+  #changelist-filter a:hover { color: var(--gold) !important; }
+
+  /* ── Forms — all inputs, selects, textareas ─────────────── */
+  .form-row { border-bottom: 1px solid var(--border) !important; }
+  .form-row label { color: var(--text-dim) !important; font-size: 0.82rem; }
+
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="url"], input[type="search"],
+  input[type="tel"], input[type="date"], input[type="datetime-local"],
+  textarea, select {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    padding: 5px 8px !important;
+  }
+  /* Select options inherit the dark scheme */
+  select option {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--gold) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(201,168,76,0.2) !important;
+  }
+  .fieldset.collapse { border-color: var(--border) !important; }
+
+  /* ── Changelist search bar ───────────────────────────────── */
+  #changelist-search input[type="search"],
+  #changelist-search input[type="text"] {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+    min-width: 260px;
+  }
+  #changelist-search input[type="submit"],
+  #changelist-search button {
+    background: var(--maroon2) !important;
+    color: #fff !important;
+    border: 1px solid var(--gold) !important;
+    border-radius: 4px !important;
+    padding: 6px 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+  }
+  #changelist-search input[type="submit"]:hover,
+  #changelist-search button:hover {
+    background: var(--gold) !important;
+    color: #111 !important;
+  }
+
+  /* ── Action toolbar (Action dropdown + Run button) ───────── */
+  .actions {
+    background: var(--bg2) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 6px 10px !important;
+    color: var(--text) !important;
+  }
+  .actions label { color: var(--text) !important; }
+  .actions select {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    padding: 4px 8px !important;
+    min-width: 180px;
+  }
+  .actions button[type="submit"],
+  .actions input[type="submit"],
+  button.button, input.button {
+    background: var(--bg3) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    padding: 4px 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+  }
+  .actions button:hover, .actions input[type="submit"]:hover {
+    background: var(--maroon2) !important;
+    color: #fff !important;
+    border-color: var(--gold) !important;
+  }
+  span.action-counter { color: var(--text-dim) !important; font-size: 0.8rem; }
+
+  /* ── Object-tools (ADD … button top-right) ───────────────── */
+  ul.object-tools { margin-top: 0 !important; }
+  ul.object-tools a,
+  ul.object-tools a:link,
+  ul.object-tools a:visited {
+    background: var(--maroon) !important;
+    color: var(--gold) !important;
+    border: 1px solid var(--gold) !important;
+    border-radius: 20px !important;
+    padding: 5px 16px !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.04em !important;
+    text-decoration: none !important;
+    text-transform: uppercase !important;
+  }
+  ul.object-tools a:hover {
+    background: var(--gold) !important;
+    color: #111 !important;
+  }
+
+  /* ── Submit row ──────────────────────────────────────────── */
+  .submit-row {
+    background: var(--bg2) !important;
+    border-top: 1px solid var(--border) !important;
+    padding: 10px 14px !important;
+  }
+  .submit-row input, .submit-row button, .default-button, input[type="submit"] {
+    background: var(--maroon2) !important;
+    color: #fff !important;
+    border: 1px solid var(--gold) !important;
+    border-radius: 5px !important;
+    font-weight: 600 !important;
+    padding: 7px 18px !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+  }
+  .submit-row input:hover, .submit-row button:hover {
+    background: var(--gold) !important;
+    color: #111 !important;
+  }
+  .deletelink, a.deletelink {
+    background: #700 !important;
+    border-color: #a00 !important;
+    color: #fcc !important;
+  }
+
+  /* ── Pagination ──────────────────────────────────────────── */
+  .paginator a { color: var(--gold) !important; }
+  .paginator .this-page {
+    background: var(--maroon) !important;
+    color: var(--gold) !important;
+    border-radius: 3px;
+    padding: 2px 7px;
+  }
+
+  /* ── Messages / alerts ───────────────────────────────────── */
+  ul.messagelist li {
+    background: #1e3a1e !important;
+    border-left: 4px solid #4caf50 !important;
+    color: #aee !important;
+  }
+  ul.messagelist li.error {
+    background: #3a1e1e !important;
+    border-left-color: #f44 !important;
+    color: #fcc !important;
+  }
+
+  /* ── Links ───────────────────────────────────────────────── */
+  a, a:link { color: var(--gold) !important; }
+  a:visited  { color: #b0923a !important; }
+  a:hover    { color: var(--gold-lt) !important; text-decoration: underline; }
+
+  /* ── Footer ──────────────────────────────────────────────── */
+  #footer {
+    background: var(--bg2) !important;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    text-align: center;
+    padding: 10px;
+    font-size: 0.78rem;
+  }
+
+  /* ── Accessibility: hard contrast overrides ─────────────── */
+  #container,
+  #content,
+  #content-main,
+  #content-related,
+  #changelist,
+  #changelist-form,
+  #changelist .results,
+  #changelist .module {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+  }
+
+  #changelist-search,
+  #changelist .actions,
+  #changelist .paginator {
+    background: var(--bg2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+
+  #result_list tbody tr td,
+  #result_list tbody tr th {
+    background: #1f1f1f !important;
+    color: #f2f2f2 !important;
+    border-color: var(--border) !important;
+    opacity: 1 !important;
+  }
+  #result_list tbody tr:nth-child(even) td,
+  #result_list tbody tr:nth-child(even) th {
+    background: #262626 !important;
+  }
+  #result_list tbody tr:hover td,
+  #result_list tbody tr:hover th {
+    background: #3a2222 !important;
+    color: #ffffff !important;
+  }
+  #result_list tbody tr.selected td,
+  #result_list tbody tr.selected th {
+    background: #4a2a2a !important;
+    color: #ffffff !important;
+  }
+
+  #result_list tbody a,
+  #result_list tbody a:link,
+  #result_list tbody a:visited {
+    color: var(--gold-lt) !important;
+    font-weight: 600 !important;
+  }
+
+  #changelist .actions label,
+  #changelist .action-counter,
+  #changelist .small,
+  #changelist .quiet,
+  #changelist .help,
+  #changelist .paginator,
+  #changelist .paginator .this-page {
+    color: var(--text) !important;
+    opacity: 1 !important;
+  }
+
+  #changelist .actions select,
+  #changelist .actions option,
+  #changelist .actions button,
+  #changelist .actions input[type="submit"] {
+    background: var(--bg3) !important;
+    color: #f2f2f2 !important;
+    border-color: var(--border) !important;
+  }
+
+  #changelist input::placeholder,
+  #changelist textarea::placeholder {
+    color: #bbbbbb !important;
+    opacity: 1 !important;
+  }
+
+  #nav-sidebar .module th,
+  #nav-sidebar .module td,
+  #nav-sidebar .module a,
+  #nav-sidebar .module a:visited {
+    color: #ededed !important;
+    opacity: 1 !important;
+  }
+  #nav-sidebar .module a:hover {
+    color: var(--gold-lt) !important;
+  }
+</style>
+{% endblock %}
+
+{% block footer %}
+<div id="footer">
+  <img src="{% static 'img/sra-logo.png' %}" alt="" style="height:20px;vertical-align:middle;margin-right:6px;border-radius:50%;" />
+  Spirit Revival Africa &mdash; Admin Portal &copy; {% now "Y" %}
+</div>
+{% endblock %}

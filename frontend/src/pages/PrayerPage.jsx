@@ -1,0 +1,142 @@
+import { useEffect, useState } from "react";
+
+import api from "../api/client";
+import { useAuth } from "../context/AuthContext";
+
+export default function PrayerPage() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ title: "", description: "", is_public: true });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    api.get("/prayer/requests/")
+      .then((r) => setRequests(r.data.results || []))
+      .catch(() => setRequests([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handlePray = async (id) => {
+    if (!isAuthenticated) return;
+    try {
+      const r = await api.post(`/prayer/requests/${id}/prayed/`);
+      setRequests((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, prayer_count: r.data.prayer_count } : p))
+      );
+    } catch { /* noop */ }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAuthenticated) return;
+    setSubmitting(true);
+    try {
+      const r = await api.post("/prayer/requests/", form);
+      setRequests((prev) => [r.data, ...prev]);
+      setForm({ title: "", description: "", is_public: true });
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 3000);
+    } catch { /* noop */ }
+    finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="page-bg min-h-screen">
+      <div className="mx-auto max-w-4xl px-6 py-16">
+        {/* Header */}
+        <div className="mb-10 text-center">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Intercession</p>
+          <h1 className="text-3xl font-black text-white sm:text-4xl">Prayer Wall</h1>
+          <p className="mt-2 text-zinc-500">Stand together in faith. Every prayer matters.</p>
+        </div>
+
+        {/* Submit form */}
+        {isAuthenticated && (
+          <div className="card mb-10">
+            <h2 className="mb-4 font-bold text-white">Share a Prayer Request</h2>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                placeholder="Title of your request…"
+                required
+                className="input-dark"
+              />
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Share your prayer need in detail…"
+                rows={3}
+                required
+                className="input-dark resize-none"
+              />
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={form.is_public}
+                    onChange={(e) => setForm((p) => ({ ...p, is_public: e.target.checked }))}
+                    className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-amber-500"
+                  />
+                  Make public
+                </label>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="ml-auto btn-gold py-2 px-5 text-sm disabled:opacity-60"
+                >
+                  {submitting ? "Submitting…" : "Submit Request"}
+                </button>
+              </div>
+              {submitted && (
+                <p className="text-sm text-emerald-400">Your prayer request has been shared. 🙏</p>
+              )}
+            </form>
+          </div>
+        )}
+
+        {/* Requests */}
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-zinc-900" />)}
+          </div>
+        ) : requests.length === 0 ? (
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-16 text-center">
+            <p className="text-4xl mb-3">🙏</p>
+            <p className="text-zinc-400 font-semibold">No prayer requests yet</p>
+            <p className="mt-1 text-sm text-zinc-600">Be the first to share a prayer need.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {requests.map((req) => (
+              <div key={req.id} className="card group flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-white">{req.title}</h3>
+                    <p className="mt-1 text-sm text-zinc-500 line-clamp-3">{req.description}</p>
+                  </div>
+                  {!req.is_public && <span className="badge-zinc shrink-0">Private</span>}
+                </div>
+                <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
+                  <span className="text-xs text-zinc-600">
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    onClick={() => handlePray(req.id)}
+                    disabled={!isAuthenticated}
+                    className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400 disabled:cursor-default"
+                  >
+                    🙏 Prayed · {req.prayer_count}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

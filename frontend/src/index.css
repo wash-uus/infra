@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  overflow-x: hidden;
+}
+body {
+  @apply bg-black text-zinc-100 antialiased;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { @apply bg-black; }
+::-webkit-scrollbar-thumb { @apply rounded-full bg-zinc-700; }
+
+/* ── Core Cards ── */
+.card {
+  @apply rounded-2xl border border-zinc-800/60 bg-zinc-950 p-6 shadow-xl;
+}
+.card-hover {
+  @apply card transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-accent/10 hover:shadow-2xl;
+}
+
+/* ── Gradient text ── */
+.text-gold {
+  @apply bg-gradient-to-r from-yellow-400 via-amber-400 to-amber-600 bg-clip-text text-transparent;
+}
+.text-fire {
+  @apply bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent;
+}
+
+/* ── Glow effects ── */
+.glow-gold {
+  box-shadow: 0 0 40px rgba(184, 134, 11, 0.15), 0 0 80px rgba(184, 134, 11, 0.05);
+}
+.glow-fire {
+  box-shadow: 0 0 40px rgba(201, 106, 26, 0.2), 0 0 80px rgba(201, 106, 26, 0.07);
+}
+
+/* ── Buttons ── */
+.btn-gold {
+  @apply inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 px-6 py-3 font-semibold text-black transition-all duration-200 hover:from-amber-400 hover:to-yellow-300 hover:shadow-lg hover:shadow-amber-500/30 active:scale-95;
+}
+.btn-outline {
+  @apply inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-6 py-3 font-medium text-zinc-200 transition-all duration-200 hover:border-accent/50 hover:bg-zinc-900 hover:text-white active:scale-95;
+}
+.btn-fire {
+  @apply inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:from-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/30 active:scale-95;
+}
+
+/* ── Inputs ── */
+.input-dark {
+  @apply w-full rounded-xl border border-zinc-700/80 bg-zinc-900/60 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none ring-0 transition-all duration-200 focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+}
+
+/* ── Section divider ── */
+.section-divider {
+  @apply my-16 border-t border-zinc-800/50;
+}
+
+/* ── Badge ── */
+.badge {
+  @apply inline-flex items-center rounded-full px-3 py-0.5 text-xs font-medium;
+}
+.badge-gold {
+  @apply badge bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20;
+}
+.badge-green {
+  @apply badge bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20;
+}
+.badge-red {
+  @apply badge bg-red-500/10 text-red-400 ring-1 ring-red-500/20;
+}
+.badge-zinc {
+  @apply badge bg-zinc-800 text-zinc-400 ring-1 ring-zinc-700;
+}
+
+/* ── Gradient backgrounds ── */
+.hero-gradient {
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(184,134,11,0.15) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 40% at 80% 50%, rgba(201,106,26,0.08) 0%, transparent 50%),
+              #000;
+}
+.page-bg {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(184,134,11,0.07) 0%, transparent 55%), #000;
+}
