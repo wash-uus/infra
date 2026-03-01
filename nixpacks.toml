@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python312", "gcc", "libpq"]
+
+[phases.install]
+cmds = ["cd backend && pip install -r requirements.txt"]
+
+[start]
+cmd = "cd backend && python manage.py collectstatic --no-input && python manage.py migrate --no-input && daphne -b 0.0.0.0 -p $PORT config.asgi:application"
