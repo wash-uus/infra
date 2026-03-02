@@ -2,7 +2,7 @@
 
 import api from "../api/client";
 
-/* â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Constants ----------------------------------------------------------- */
 const TYPE_FILTERS = [
   { value: "", label: "All" },
   { value: "book", label: "Books" },
@@ -15,13 +15,13 @@ const TYPE_FILTERS = [
 ];
 
 const TYPE_META = {
-  book:            { icon: "ðŸ“–", color: "from-blue-600/30 to-blue-900/20",    badge: "bg-blue-900/40 text-blue-300 border-blue-800" },
-  mp3_sermon:      { icon: "ðŸŽ™ï¸", color: "from-purple-600/30 to-purple-900/20", badge: "bg-purple-900/40 text-purple-300 border-purple-800" },
-  video:           { icon: "ðŸŽ¬", color: "from-red-600/30 to-red-900/20",      badge: "bg-red-900/40 text-red-300 border-red-800" },
-  journal:         { icon: "ðŸ““", color: "from-green-600/30 to-green-900/20",   badge: "bg-green-900/40 text-green-300 border-green-800" },
-  wisdom:          { icon: "âœ¨", color: "from-amber-600/30 to-amber-900/20",   badge: "bg-amber-900/40 text-amber-300 border-amber-800" },
-  daily_scripture: { icon: "ðŸ“œ", color: "from-teal-600/30 to-teal-900/20",    badge: "bg-teal-900/40 text-teal-300 border-teal-800" },
-  image:           { icon: "ðŸ–¼ï¸", color: "from-pink-600/30 to-pink-900/20",    badge: "bg-pink-900/40 text-pink-300 border-pink-800" },
+  book:            { icon: "📖", color: "from-blue-600/30 to-blue-900/20",    badge: "bg-blue-900/40 text-blue-300 border-blue-800" },
+  mp3_sermon:      { icon: "🎙️", color: "from-purple-600/30 to-purple-900/20", badge: "bg-purple-900/40 text-purple-300 border-purple-800" },
+  video:           { icon: "🎬", color: "from-red-600/30 to-red-900/20",      badge: "bg-red-900/40 text-red-300 border-red-800" },
+  journal:         { icon: "📓", color: "from-green-600/30 to-green-900/20",   badge: "bg-green-900/40 text-green-300 border-green-800" },
+  wisdom:          { icon: "✨", color: "from-amber-600/30 to-amber-900/20",   badge: "bg-amber-900/40 text-amber-300 border-amber-800" },
+  daily_scripture: { icon: "📜", color: "from-teal-600/30 to-teal-900/20",    badge: "bg-teal-900/40 text-teal-300 border-teal-800" },
+  image:           { icon: "🖼️", color: "from-pink-600/30 to-pink-900/20",    badge: "bg-pink-900/40 text-pink-300 border-pink-800" },
 };
 
 function fmtDate(ts) {
@@ -29,7 +29,7 @@ function fmtDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-/* â”€â”€ Per-type media renderers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Per-type media renderers -------------------------------------------- */
 function AudioCard({ item }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -126,9 +126,9 @@ function ImageCard({ item }) {
   );
 }
 
-/* â”€â”€ Content card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Content card -------------------------------------------------------- */
 function ContentCard({ item }) {
-  const meta = TYPE_META[item.type] || { icon: "ðŸ“„", color: "from-zinc-700/30 to-zinc-900/20", badge: "bg-zinc-800 text-zinc-400 border-zinc-700" };
+  const meta = TYPE_META[item.type] || { icon: "📄", color: "from-zinc-700/30 to-zinc-900/20", badge: "bg-zinc-800 text-zinc-400 border-zinc-700" };
   const label = item.type.replace(/_/g, " ");
 
   return (
@@ -186,7 +186,7 @@ function ContentCard({ item }) {
             {item.author_name || item.author_email?.split("@")[0] || "SRA"}
           </p>
           <p className="text-[10px] text-zinc-600">
-            {item.category ? `${item.category} Â· ` : ""}{fmtDate(item.created_at)}
+            {item.category ? `${item.category} · ` : ""}{fmtDate(item.created_at)}
           </p>
         </div>
         {(item.type === "book" || item.type === "journal") && item.media_url && (
@@ -205,10 +205,12 @@ function ContentCard({ item }) {
   );
 }
 
-/* â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Page ---------------------------------------------------------------- */
 export default function ContentPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
   const [activeType, setActiveType] = useState("");
   const [search, setSearch] = useState("");
   const [counts, setCounts] = useState({});
@@ -218,6 +220,7 @@ export default function ContentPage() {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLoading(true);
+      setNextUrl(null);
       const params = {};
       if (activeType) params.type = activeType;
       if (search.trim()) params.search = search.trim();
@@ -226,6 +229,7 @@ export default function ContentPage() {
         .then((r) => {
           const data = r.data.results || [];
           setItems(data);
+          setNextUrl(r.data.next || null);
           if (!activeType) {
             const c = {};
             data.forEach((d) => { c[d.type] = (c[d.type] || 0) + 1; });
@@ -236,6 +240,17 @@ export default function ContentPage() {
         .finally(() => setLoading(false));
     }, search ? 350 : 0);
   }, [activeType, search]);
+
+  const handleLoadMore = async () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await api.get(nextUrl);
+      setItems((prev) => [...prev, ...(r.data.results || [])]);
+      setNextUrl(r.data.next || null);
+    } catch { /* noop */ }
+    finally { setLoadingMore(false); }
+  };
 
   return (
     <div className="page-bg min-h-screen">
@@ -256,7 +271,7 @@ export default function ContentPage() {
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
           </svg>
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search titles, descriptionsâ€¦" className="input-dark w-full pl-10" />
+            placeholder="Search titles, descriptions…" className="input-dark w-full pl-10" />
         </div>
 
         {/* Type filters */}
@@ -288,7 +303,7 @@ export default function ContentPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-16 text-center">
-            <p className="text-4xl mb-3">ðŸ“­</p>
+            <p className="text-4xl mb-3">🔭</p>
             <p className="font-semibold text-zinc-400">
               {search ? `No results for "${search}"` : "No content yet"}
             </p>
@@ -299,6 +314,19 @@ export default function ContentPage() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((item) => <ContentCard key={item.id} item={item} />)}
+          </div>
+        )}
+
+        {/* Load More */}
+        {nextUrl && !loading && (
+          <div className="mt-10 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="btn-outline px-8 py-2.5 text-sm rounded-xl disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load More"}
+            </button>
           </div>
         )}
       </div>

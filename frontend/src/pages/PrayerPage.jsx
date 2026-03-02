@@ -6,17 +6,34 @@ import { useAuth } from "../context/AuthContext";
 export default function PrayerPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", is_public: true });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     api.get("/prayer/requests/")
-      .then((r) => setRequests(r.data.results || []))
+      .then((r) => {
+        setRequests(r.data.results || []);
+        setNextUrl(r.data.next || null);
+      })
       .catch(() => setRequests([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleLoadMore = async () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await api.get(nextUrl);
+      setRequests((prev) => [...prev, ...(r.data.results || [])]);
+      setNextUrl(r.data.next || null);
+    } catch { /* noop */ }
+    finally { setLoadingMore(false); }
+  };
 
   const handlePray = async (id) => {
     if (!isAuthenticated) return;
@@ -32,14 +49,19 @@ export default function PrayerPage() {
     e.preventDefault();
     if (!isAuthenticated) return;
     setSubmitting(true);
+    setSubmitError("");
     try {
       const r = await api.post("/prayer/requests/", form);
       setRequests((prev) => [r.data, ...prev]);
       setForm({ title: "", description: "", is_public: true });
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
-    } catch { /* noop */ }
-    finally { setSubmitting(false); }
+    } catch (err) {
+      const msg = err?.response?.data?.detail
+        || err?.response?.data?.non_field_errors?.[0]
+        || "Failed to submit request. Please try again.";
+      setSubmitError(msg);
+    } finally { setSubmitting(false); }
   };
 
   return (
@@ -94,6 +116,9 @@ export default function PrayerPage() {
               {submitted && (
                 <p className="text-sm text-emerald-400">Your prayer request has been shared. 🙏</p>
               )}
+              {submitError && (
+                <p className="text-sm text-red-400">{submitError}</p>
+              )}
             </form>
           </div>
         )}
@@ -125,15 +150,32 @@ export default function PrayerPage() {
                     {new Date(req.created_at).toLocaleDateString()}
                   </span>
                   <button
-                    onClick={() => handlePray(req.id)}
-                    disabled={!isAuthenticated}
-                    className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400 disabled:cursor-default"
+                    onClick={() =>
+                      isAuthenticated
+                        ? handlePray(req.id)
+                        : (window.location.assign("/login"))
+                    }
+                    title={!isAuthenticated ? "Sign in to pray" : undefined}
+                    className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
                   >
-                    🙏 Prayed · {req.prayer_count}
+                    🙏 {isAuthenticated ? `Prayed · ${req.prayer_count}` : "Pray"}
                   </button>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load More */}
+        {nextUrl && !loading && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="btn-outline px-8 py-2.5 text-sm rounded-xl disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load More"}
+            </button>
           </div>
         )}
       </div>

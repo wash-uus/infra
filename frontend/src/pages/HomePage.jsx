@@ -5,19 +5,19 @@ import { getHomeFeed } from "../api/homeContent";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 
 const features = [
-  { icon: "📖", title: "Content Library", description: "Books, sermons, MP3s, videos, journals and daily scripture from revivalists across the continent.", link: "/content" },
-  { icon: "🔥", title: "Revival Hubs", description: "Physical and digital revival centres forming across Africa. Find or start a hub in your city.", link: "/hubs" },
-  { icon: "🙏", title: "Prayer Network", description: "Submit requests, stand in agreement, and track answered prayers across the movement.", link: "/prayer" },
-  { icon: "👥", title: "Community Groups", description: "Youths, women, worshippers, preachers, intercessors — your tribe is here.", link: "/groups" },
-  { icon: "🎓", title: "Discipleship", description: "Structured courses and lessons with video, PDF materials and progress tracking.", link: "/discipleship" },
-  { icon: "💬", title: "Live Messaging", description: "Real-time direct and group messaging powered by WebSockets across the network.", link: "/messages" },
+  { icon: "📖", title: "Content Library", description: "Dive into books, sermons, teachings, videos and daily scripture curated by revivalists across the continent.", link: "/content" },
+  { icon: "🔥", title: "Revival Hubs", description: "Centres of fire are rising across Africa. Find a hub near you — or pioneer one in your city.", link: "/hubs" },
+  { icon: "🙏", title: "Prayer Network", description: "Lift your voice with thousands of intercessors. Submit requests, agree in faith, and witness answered prayer.", link: "/prayer" },
+  { icon: "👥", title: "Community Groups", description: "Youths, women, worshippers, preachers, intercessors — your tribe is already here. Join the circle.", link: "/groups" },
+  { icon: "🎓", title: "Discipleship", description: "Grow deeper in your walk with structured courses, video lessons and progress tracking designed for every believer.", link: "/discipleship" },
+  { icon: "💬", title: "Live Messaging", description: "Stay connected with your community through real-time direct messages and group conversations across the network.", link: "/messages" },
 ];
 
 const stats = [
-  { value: "54", label: "African Nations Targeted" },
+  { value: "54", label: "African Nations Reached" },
   { value: "7", label: "Ministry Groups" },
-  { value: "∞", label: "Lives For Christ" },
-  { value: "1", label: "Spirit — Holy" },
+  { value: "∞", label: "Lives for Christ" },
+  { value: "1", label: "Holy Spirit" },
 ];
 
 export default function HomePage() {
@@ -83,6 +83,23 @@ export default function HomePage() {
         <AnnouncementBanner />
       </section>
 
+      {/* SCROLLING VERSE — Acts 1:7-9 */}
+      <section className="mt-8 mb-4 overflow-hidden border-y border-purple-800/40 bg-purple-950/25 py-5 select-none">
+        <div className="flex whitespace-nowrap animate-marquee">
+          {[...Array(4)].map((_, i) => (
+            <span key={i} className="inline-flex items-center gap-6 px-12 text-sm font-black tracking-widest uppercase text-purple-300 sm:text-base">
+              <span className="text-purple-500 text-lg">✦</span>
+              AND HE SAID UNTO THEM, IT IS NOT FOR YOU TO KNOW THE TIMES OR THE SEASONS, WHICH THE FATHER HATH PUT IN HIS OWN POWER.
+              <span className="text-purple-200 mx-1">BUT YE SHALL RECEIVE POWER, AFTER THAT THE HOLY GHOST IS COME UPON YOU:</span>
+              AND YE SHALL BE WITNESSES UNTO ME BOTH IN JERUSALEM, AND IN ALL JUDAEA, AND IN SAMARIA, AND UNTO THE UTTERMOST PART OF THE EARTH.
+              AND WHEN HE HAD SPOKEN THESE THINGS, WHILE THEY BEHELD, HE WAS TAKEN UP; AND A CLOUD RECEIVED HIM OUT OF THEIR SIGHT.
+              <span className="text-purple-400 italic normal-case ml-2">— Acts 1:7–9 (KJV)</span>
+              <span className="text-purple-600 text-lg mx-6">✦</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* STATS */}
       <section className="mx-auto max-w-7xl px-6 pb-20">
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-800/30 md:grid-cols-4">
@@ -98,9 +115,9 @@ export default function HomePage() {
       {/* FEATURES */}
       <section className="mx-auto max-w-7xl px-6 pb-24">
         <div className="mb-14 text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Platform</p>
-          <h2 className="text-3xl font-black text-white sm:text-4xl">Everything the Movement Needs</h2>
-          <p className="mt-3 text-zinc-500">One platform. Every tool for continental revival.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">The Platform</p>
+          <h2 className="text-3xl font-black text-white sm:text-4xl">Built for the Movement.<br className="hidden sm:block" /> Designed for Revival.</h2>
+          <p className="mt-3 max-w-xl mx-auto text-zinc-400">Everything your ministry, community and spiritual walk needs — worship, prayer, discipleship and connection, all in one place.</p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map(({ icon, title, description, link }) => (
@@ -182,9 +199,9 @@ export default function HomePage() {
       {/* SHORT STORIES */}
       <section className="mx-auto max-w-7xl px-6 pb-24">
         <div className="mb-10 text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Daily Bread</p>
-          <h2 className="text-3xl font-black text-white sm:text-4xl">Short Stories</h2>
-          <p className="mt-3 text-zinc-500">Fresh encouragement shared by the admin team.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Stories of Faith</p>
+          <h2 className="text-3xl font-black text-white sm:text-4xl">Hear What God Is Doing</h2>
+          <p className="mt-3 text-zinc-400">Moments of grace, breakthrough and revival from hearts across the movement.</p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -312,11 +329,11 @@ export default function HomePage() {
       {/* CTA */}
       <section className="mx-auto max-w-3xl px-6 pb-32 text-center">
         <h2 className="mb-4 text-3xl font-black text-white sm:text-4xl">
-          Ready to be Part of the{" "}
-          <span className="bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent">Revival?</span>
+          Your Revival Journey{" "}
+          <span className="bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent">Starts Here.</span>
         </h2>
-        <p className="mb-8 text-zinc-500">Create your free account and connect with thousands of believers across Africa.</p>
-        <Link to="/register" className="btn-gold text-base px-10 py-4">Create Free Account</Link>
+        <p className="mb-8 text-zinc-400">Join thousands of believers, intercessors and leaders across Africa building the Kingdom together.</p>
+        <Link to="/register" className="btn-gold text-base px-10 py-4">Join the Movement — It's Free</Link>
       </section>
     </div>
   );

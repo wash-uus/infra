@@ -9,6 +9,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Forgot password flow
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -27,9 +34,35 @@ export default function LoginPage() {
     }
   };
 
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    try {
+      await api.post("/accounts/password-reset/", { email: forgotEmail });
+    } catch { /* noop — don't reveal whether email exists */ }
+    finally {
+      setForgotLoading(false);
+      setForgotSent(true);
+    }
+  };
+
   return (
     <div className="page-bg flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-20">
       <div className="w-full max-w-md">
+
+        {/* Back to Home */}
+        <div className="mb-6">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-zinc-300"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Home
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-2xl font-black text-black shadow-xl shadow-amber-500/30">
@@ -41,51 +74,117 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="card glow-gold space-y-5">
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-400">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="input-dark"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-400">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="input-dark"
-              />
-            </div>
+          {!showForgot ? (
+            <>
+              {/* ── Sign-in form ── */}
+              <form onSubmit={submit} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    disabled={loading}
+                    className="input-dark disabled:opacity-50"
+                  />
+                </div>
 
-            {error && (
-              <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setShowForgot(true); setForgotEmail(email); setError(""); }}
+                      className="text-xs text-amber-400 transition hover:text-amber-300"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    disabled={loading}
+                    className="input-dark disabled:opacity-50"
+                  />
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-gold w-full justify-center py-3 text-sm disabled:opacity-60"
+                >
+                  {loading ? "Signing in…" : "Sign In"}
+                </button>
+              </form>
+
+              <div className="border-t border-zinc-800 pt-4 text-center text-sm text-zinc-500">
+                Don't have an account?{" "}
+                <Link to="/register" className="font-semibold text-amber-400 hover:text-amber-300">
+                  Create one free
+                </Link>
               </div>
-            )}
+            </>
+          ) : (
+            <>
+              {/* ── Forgot password form ── */}
+              <button
+                onClick={() => { setShowForgot(false); setForgotSent(false); }}
+                className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-zinc-300"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Sign In
+              </button>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-gold w-full justify-center py-3 text-sm disabled:opacity-60"
-            >
-              {loading ? "Signing in…" : "Sign In"}
-            </button>
-          </form>
+              <div>
+                <h2 className="text-lg font-bold text-white">Reset your password</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Enter your email and we'll send a reset link if an account exists.
+                </p>
+              </div>
 
-          <div className="border-t border-zinc-800 pt-4 text-center text-sm text-zinc-500">
-            Don't have an account?{" "}
-            <Link to="/register" className="font-semibold text-amber-400 hover:text-amber-300">
-              Create one free
-            </Link>
-          </div>
+              {forgotSent ? (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-400">
+                  ✓ If that email is registered, a reset link has been sent. Check your inbox.
+                </div>
+              ) : (
+                <form onSubmit={submitForgot} className="space-y-3">
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    required
+                    disabled={forgotLoading}
+                    className="input-dark disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="btn-gold w-full justify-center py-3 text-sm disabled:opacity-60"
+                  >
+                    {forgotLoading ? "Sending…" : "Send Reset Link"}
+                  </button>
+                </form>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

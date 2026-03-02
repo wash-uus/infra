@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getGallery } from "../api/gallery";
+import { getGallery, getGalleryPage } from "../api/gallery";
 
 const TABS = [
   { label: "All", value: null },
@@ -13,7 +13,7 @@ function VideoEmbed({ item }) {
 
   if (!src) {
     return (
-      <div className="flex items-center justify-center w-full h-full bg-stone-800 text-stone-400 text-sm">
+      <div className="flex items-center justify-center w-full h-full bg-zinc-800 text-zinc-400 text-sm">
         No video source
       </div>
     );
@@ -64,6 +64,8 @@ export default function GalleryPage() {
   const [activeTab, setActiveTab] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
   const [error, setError] = useState(null);
   const [lightbox, setLightbox] = useState(null); // { item, index }
   const [videoModal, setVideoModal] = useState(null); // item
@@ -71,11 +73,27 @@ export default function GalleryPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setNextUrl(null);
     getGallery(activeTab)
-      .then((res) => setItems(res.data.results || []))
+      .then((res) => {
+        setItems(res.data.results || []);
+        setNextUrl(res.data.next || null);
+      })
       .catch(() => setError("Failed to load gallery. Please try again."))
       .finally(() => setLoading(false));
   }, [activeTab]);
+
+  const handleLoadMore = async () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const path = nextUrl.replace(/^https?:\/\/[^/]+/, "");
+      const res = await getGalleryPage(path);
+      setItems((prev) => [...prev, ...(res.data.results || [])]);
+      setNextUrl(res.data.next || null);
+    } catch { /* noop */ }
+    finally { setLoadingMore(false); }
+  };
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -99,13 +117,13 @@ export default function GalleryPage() {
   const photos = items.filter((i) => i.media_type === "photo");
 
   return (
-    <div className="min-h-screen bg-stone-950 text-white py-12 px-4">
+    <div className="min-h-screen page-bg text-white py-12 px-4">
       {/* Header */}
       <div className="max-w-6xl mx-auto mb-10 text-center">
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">
           <span className="text-amber-400">Gallery</span>
         </h1>
-        <p className="text-stone-400 max-w-xl mx-auto">
+        <p className="text-zinc-400 max-w-xl mx-auto">
           Photos and videos from Spirit Revival Africa — capturing moments of
           faith, community and worship.
         </p>
@@ -119,8 +137,8 @@ export default function GalleryPage() {
             onClick={() => setActiveTab(value)}
             className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
               activeTab === value
-                ? "bg-amber-500 text-stone-950 shadow-lg shadow-amber-500/30"
-                : "bg-stone-800 text-stone-300 hover:bg-stone-700"
+                ? "bg-amber-500 text-black shadow-lg shadow-amber-500/30"
+                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
             }`}
           >
             {label}
@@ -142,7 +160,7 @@ export default function GalleryPage() {
 
       {/* Empty */}
       {!loading && !error && items.length === 0 && (
-        <div className="text-center text-stone-500 py-20 text-lg">
+        <div className="text-center text-zinc-500 py-20 text-lg">
           No gallery items yet. Check back soon!
         </div>
       )}
@@ -177,7 +195,7 @@ export default function GalleryPage() {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-52 bg-stone-800 flex items-center justify-center text-stone-500 text-5xl">
+                  <div className="w-full h-52 bg-zinc-800 flex items-center justify-center text-zinc-500 text-5xl">
                     {isPhoto ? "🖼" : "▶"}
                   </div>
                 )}
@@ -188,7 +206,7 @@ export default function GalleryPage() {
                                 justify-end p-4">
                   <p className="text-white font-semibold text-sm leading-tight">{item.title}</p>
                   {item.caption && (
-                    <p className="text-stone-300 text-xs mt-1 line-clamp-2">{item.caption}</p>
+                    <p className="text-zinc-300 text-xs mt-1 line-clamp-2">{item.caption}</p>
                   )}
                 </div>
 
@@ -208,13 +226,26 @@ export default function GalleryPage() {
                 {/* Type badge */}
                 <span
                   className={`absolute top-2 right-2 text-xs font-semibold px-2 py-0.5 rounded-full
-                    ${isPhoto ? "bg-amber-500 text-stone-950" : "bg-blue-600 text-white"}`}
+                    ${isPhoto ? "bg-amber-500 text-black" : "bg-blue-600 text-white"}`}
                 >
                   {isPhoto ? "Photo" : "Video"}
                 </span>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Load More */}
+      {nextUrl && !loading && (
+        <div className="max-w-6xl mx-auto mt-10 text-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="rounded-full border border-zinc-700 px-8 py-2.5 text-sm font-semibold text-zinc-300 hover:border-amber-500 hover:text-amber-400 transition-colors disabled:opacity-50"
+          >
+            {loadingMore ? "Loading…" : "Load More"}
+          </button>
         </div>
       )}
 
@@ -226,7 +257,7 @@ export default function GalleryPage() {
         >
           {/* Close */}
           <button
-            className="absolute top-4 right-4 text-white bg-stone-800 hover:bg-amber-500 rounded-full
+            className="absolute top-4 right-4 text-white bg-zinc-800 hover:bg-amber-500 rounded-full
                        w-10 h-10 flex items-center justify-center text-xl z-10 transition-colors"
             onClick={() => setLightbox(null)}
           >
@@ -236,7 +267,7 @@ export default function GalleryPage() {
           {/* Prev */}
           {photos.length > 1 && (
             <button
-              className="absolute left-4 text-white bg-stone-800 hover:bg-amber-500 rounded-full
+              className="absolute left-4 text-white bg-zinc-800 hover:bg-amber-500 rounded-full
                          w-10 h-10 flex items-center justify-center text-xl z-10 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
@@ -259,7 +290,7 @@ export default function GalleryPage() {
           {/* Next */}
           {photos.length > 1 && (
             <button
-              className="absolute right-4 text-white bg-stone-800 hover:bg-amber-500 rounded-full
+              className="absolute right-4 text-white bg-zinc-800 hover:bg-amber-500 rounded-full
                          w-10 h-10 flex items-center justify-center text-xl z-10 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
@@ -280,7 +311,7 @@ export default function GalleryPage() {
             >
               <p className="text-white font-semibold text-sm">{lightbox.item.title}</p>
               {lightbox.item.caption && (
-                <p className="text-stone-400 text-xs mt-0.5">{lightbox.item.caption}</p>
+                <p className="text-zinc-400 text-xs mt-0.5">{lightbox.item.caption}</p>
               )}
             </div>
           )}
@@ -294,7 +325,7 @@ export default function GalleryPage() {
           onClick={() => setVideoModal(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white bg-stone-800 hover:bg-amber-500 rounded-full
+            className="absolute top-4 right-4 text-white bg-zinc-800 hover:bg-amber-500 rounded-full
                        w-10 h-10 flex items-center justify-center text-xl z-10 transition-colors"
             onClick={() => setVideoModal(null)}
           >
@@ -313,7 +344,7 @@ export default function GalleryPage() {
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center max-w-xl">
               <p className="text-white font-semibold">{videoModal.title}</p>
               {videoModal.caption && (
-                <p className="text-stone-400 text-sm mt-1">{videoModal.caption}</p>
+                <p className="text-zinc-400 text-sm mt-1">{videoModal.caption}</p>
               )}
             </div>
           )}

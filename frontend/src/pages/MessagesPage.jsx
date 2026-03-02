@@ -20,7 +20,7 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Toast ---------------------------------------------------------------------
 function Toast({ msg }) {
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-800 border border-zinc-700
@@ -30,7 +30,7 @@ function Toast({ msg }) {
   );
 }
 
-// â”€â”€ Typing indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Typing indicator ----------------------------------------------------------
 function TypingIndicator({ name }) {
   if (!name) return null;
   return (
@@ -46,7 +46,7 @@ function TypingIndicator({ name }) {
   );
 }
 
-// â”€â”€ Message bubble with hover actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Message bubble with hover actions -----------------------------------------
 // -- Message bubble with hover actions ----------------------------------------
 function MessageBubble({ m, isMine, onDelete, onCopy, onShare }) {
   const [hover, setHover] = useState(false);
@@ -139,7 +139,9 @@ function DirectTab({ isAuthenticated }) {
   useEffect(() => {
     wsRef.current?.close();
     if (!selected || !user) return;
-    const ws = new WebSocket(`ws://localhost:8000/ws/messages/direct/${selected.other_user_id || selected.sender}/`);
+    const wsBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api")
+      .replace(/^http/, "ws").replace(/\/api\/?$/, "");
+    const ws = new WebSocket(`${wsBase}/ws/messages/direct/${selected.other_user_id || selected.sender}/`);
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
@@ -317,7 +319,7 @@ function DirectTab({ isAuthenticated }) {
   );
 }
 
-/* â”€â”€ Group Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Group Chat ----------------------------------------- */
 function GroupsTab({ isAuthenticated }) {
   const [groups, setGroups] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -348,7 +350,9 @@ function GroupsTab({ isAuthenticated }) {
       .then((r) => setThread(r.data.results || []))
       .catch(() => setThread([]));
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/messages/group/${selected.id}/`);
+    const wsBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api")
+      .replace(/^http/, "ws").replace(/\/api\/?$/, "");
+    const ws = new WebSocket(`${wsBase}/ws/messages/group/${selected.id}/`);
     ws.onopen = () => setWsStatus("connected");
     ws.onclose = () => setWsStatus("disconnected");
     ws.onerror = () => setWsStatus("error");
@@ -545,7 +549,7 @@ function GroupsTab({ isAuthenticated }) {
   );
 }
 
-/* â”€â”€ Main MessagesPage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* -- Main MessagesPage ---------------------------------- */
 export default function MessagesPage() {
   const [tab, setTab] = useState("groups");
   const { isAuthenticated } = useAuth();

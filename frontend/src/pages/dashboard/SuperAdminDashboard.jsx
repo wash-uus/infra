@@ -87,6 +87,7 @@ export default function SuperAdminDashboard() {
   const [auditHasMore, setAuditHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { title, desc, label, fn }
 
   const showToast = (msg, err = false) => {
@@ -95,16 +96,20 @@ export default function SuperAdminDashboard() {
   };
 
   // ── Load overview data ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const r = await getSuperAdminStats();
-        setStats(r.data);
-      } catch {}
-      setLoading(false);
-    };
-    load();
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const r = await getSuperAdminStats();
+      setStats(r.data);
+    } catch {
+      setLoadError(true);
+      showToast("Failed to load dashboard data", true);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   // ── Load admins tab ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -113,7 +118,9 @@ export default function SuperAdminDashboard() {
       try {
         const r = await getUsers({ role: "admin" });
         setAdmins(r.data.results ?? r.data);
-      } catch {}
+      } catch {
+        showToast("Failed to load admins", true);
+      }
     };
     load();
   }, [tab]);
@@ -125,7 +132,9 @@ export default function SuperAdminDashboard() {
       const rows = r.data.results ?? r.data;
       setAudit(prev => page === 1 ? rows : [...prev, ...rows]);
       if (!r.data.next) setAuditHasMore(false);
-    } catch {}
+    } catch {
+      showToast("Failed to load audit log", true);
+    }
   }, []);
 
   useEffect(() => {
@@ -192,6 +201,22 @@ export default function SuperAdminDashboard() {
     return (
       <DashLayout title="Super Admin Dashboard">
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
+      </DashLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashLayout title="Super Admin Dashboard">
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
+          <p className="text-zinc-400">Failed to load super admin data. Check your connection.</p>
+          <button
+            onClick={loadStats}
+            className="rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </DashLayout>
     );
   }

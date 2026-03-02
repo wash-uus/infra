@@ -20,36 +20,65 @@ function getGroupIcon(slug) {
   return groupIcons[slug] || "👥";
 }
 
+function Toast({ msg, err }) {
+  return (
+    <div className={`fixed top-5 right-5 z-[99] rounded-xl px-5 py-3 text-sm font-medium shadow-2xl ${
+      err ? "bg-red-900 text-red-200 border border-red-700" : "bg-emerald-900 text-emerald-200 border border-emerald-700"
+    }`}>
+      {msg}
+    </div>
+  );
+}
+
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
+  const [toast, setToast] = useState(null);
   const { isAuthenticated } = useAuth();
+
+  const showToast = (msg, err = false) => {
+    setToast({ msg, err });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     api.get("/groups/")
-      .then((r) => setGroups(r.data.results || r.data || []))
+      .then((r) => {
+        setGroups(r.data.results || r.data || []);
+        setNextUrl(r.data.next || null);
+      })
       .catch(() => setGroups([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleJoin = async (id) => {
+  const handleLoadMore = async () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
     try {
-      await api.post(`/groups/${id}/join/`);
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === id
-            ? { ...g, is_member: true, member_count: (g.member_count || 0) + 1 }
-            : g
-        )
-      );
-    } catch {
-      // silent
-    }
+      const r = await api.get(nextUrl);
+      setGroups((prev) => [...prev, ...(r.data.results || [])]);
+      setNextUrl(r.data.next || null);
+    } catch { /* noop */ }
+    finally { setLoadingMore(false); }
   };
 
-  const handleLeave = async (id) => {
+  const handleJoin = async (id) => {
+    if (!isAuthenticated) return;
+    // Optimistically update UI
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === id
+          ? { ...g, is_member: true, member_count: (g.member_count || 0) + 1 }
+          : g
+      )
+    );
     try {
-      await api.post(`/groups/${id}/leave/`);
+      await api.post(`/groups/${id}/join/`);
+      showToast("You joined the group!");
+    } catch {
+      // Roll back optimistic update
       setGroups((prev) =>
         prev.map((g) =>
           g.id === id
@@ -57,13 +86,39 @@ export default function GroupsPage() {
             : g
         )
       );
+      showToast("Failed to join group. Please try again.", true);
+    }
+  };
+
+  const handleLeave = async (id) => {
+    if (!isAuthenticated) return;
+    // Optimistically update UI
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === id
+          ? { ...g, is_member: false, member_count: Math.max(0, (g.member_count || 1) - 1) }
+          : g
+      )
+    );
+    try {
+      await api.post(`/groups/${id}/leave/`);
+      showToast("You left the group.");
     } catch {
-      // silent
+      // Roll back optimistic update
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === id
+            ? { ...g, is_member: true, member_count: (g.member_count || 0) + 1 }
+            : g
+        )
+      );
+      showToast("Failed to leave group. Please try again.", true);
     }
   };
 
   return (
     <div className="page-bg min-h-screen">
+      {toast && <Toast {...toast} />}
       <div className="mx-auto max-w-7xl px-6 py-16">
         <AnnouncementBanner />
         {/* Header */}
@@ -138,6 +193,19 @@ export default function GroupsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load More */}
+        {nextUrl && !loading && (
+          <div className="mt-10 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="btn-outline px-8 py-2.5 text-sm rounded-xl disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load More"}
+            </button>
           </div>
         )}
       </div>

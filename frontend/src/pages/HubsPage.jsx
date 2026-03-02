@@ -8,32 +8,73 @@ const statusInfo = {
   pending: { label: "Pending", cls: "badge-gold" },
 };
 
+function Toast({ msg, err }) {
+  return (
+    <div className={`fixed top-5 right-5 z-[99] rounded-xl px-5 py-3 text-sm font-medium shadow-2xl ${
+      err ? "bg-red-900 text-red-200 border border-red-700" : "bg-emerald-900 text-emerald-200 border border-emerald-700"
+    }`}>
+      {msg}
+    </div>
+  );
+}
+
 export default function HubsPage() {
   const [hubs, setHubs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", country: "", city: "", description: "", meeting_schedule: "" });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
+  const [applyError, setApplyError] = useState("");
+  const [toast, setToast] = useState(null);
+  const [joinedIds, setJoinedIds] = useState(new Set());
   const { isAuthenticated } = useAuth();
+
+  const showToast = (msg, err = false) => {
+    setToast({ msg, err });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     api.get("/hubs/")
-      .then((r) => setHubs(r.data.results || []))
+      .then((r) => {
+        setHubs(r.data.results || []);
+        setNextUrl(r.data.next || null);
+      })
       .catch(() => setHubs([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleLoadMore = async () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await api.get(nextUrl);
+      setHubs((prev) => [...prev, ...(r.data.results || [])]);
+      setNextUrl(r.data.next || null);
+    } catch { /* noop */ }
+    finally { setLoadingMore(false); }
+  };
 
   const handleJoin = async (id) => {
     if (!isAuthenticated) return;
     try {
       await api.post(`/hubs/${id}/join/`);
-    } catch { /* noop */ }
+      setJoinedIds((prev) => new Set(prev).add(id));
+      setSuccess("You have joined this hub! Welcome to the network.");
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Failed to join hub. Please try again.";
+      showToast(msg, true);
+    }
   };
 
   const handleApply = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    setApplyError("");
     try {
       const r = await api.post("/hubs/", form);
       setHubs((prev) => [r.data, ...prev]);
@@ -41,12 +82,17 @@ export default function HubsPage() {
       setShowForm(false);
       setSuccess("Hub application submitted! Awaiting admin approval.");
       setTimeout(() => setSuccess(""), 4000);
-    } catch { /* noop */ }
-    finally { setSubmitting(false); }
+    } catch (err) {
+      const msg = err?.response?.data?.name?.[0]
+        || err?.response?.data?.detail
+        || "Failed to submit application. Please try again.";
+      setApplyError(msg);
+    } finally { setSubmitting(false); }
   };
 
   return (
     <div className="page-bg min-h-screen">
+      {toast && <Toast {...toast} />}
       <div className="mx-auto max-w-7xl px-6 py-16">
         {/* Header */}
         <div className="mb-10 flex flex-col items-center text-center gap-6">
@@ -81,6 +127,9 @@ export default function HubsPage() {
               <input key={key} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} className="input-dark" />
             ))}
             <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Describe your hub vision…" rows={3} className="input-dark col-span-full resize-none" />
+            {applyError && (
+              <p className="col-span-full text-sm text-red-400">{applyError}</p>
+            )}
             <div className="col-span-full flex justify-end">
               <button type="submit" disabled={submitting} className="btn-gold py-2.5 px-7 text-sm disabled:opacity-60">
                 {submitting ? "Submitting…" : "Submit Application"}
@@ -130,13 +179,37 @@ export default function HubsPage() {
 
                 <div className="mt-auto border-t border-zinc-800 pt-3">
                   {isAuthenticated && hub.status === "approved" && (
-                    <button onClick={() => handleJoin(hub.id)} className="w-full btn-outline py-2 text-xs justify-center">
-                      Join Hub
-                    </button>
+                    joinedIds.has(hub.id) ? (
+                      <p className="w-full text-center py-2 text-xs font-semibold text-emerald-400">
+                        ✓ Joined
+                      </p>
+                    ) : (
+                      <button onClick={() => handleJoin(hub.id)} className="w-full btn-outline py-2 text-xs justify-center">
+                        Join Hub
+                      </button>
+                    )
+                  )}
+                  {!isAuthenticated && hub.status === "approved" && (
+                    <a href="/login" className="block w-full text-center py-2 text-xs text-zinc-500 hover:text-amber-400 transition-colors">
+                      Sign in to join
+                    </a>
                   )}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load More */}
+        {nextUrl && !loading && (
+          <div className="mt-10 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="btn-outline px-8 py-2.5 text-sm rounded-xl disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load More"}
+            </button>
           </div>
         )}
       </div>

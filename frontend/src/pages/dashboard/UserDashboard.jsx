@@ -33,18 +33,39 @@ function Section({ title, children }) {
 export default function UserDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadDashboard = () => {
+    setLoading(true);
+    setError(false);
     getMemberDashboard()
       .then(r => setData(r.data))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadDashboard(); }, []);
 
   if (loading) {
     return (
       <DashLayout title="My Dashboard">
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
+      </DashLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashLayout title="My Dashboard">
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
+          <p className="text-zinc-400">Failed to load dashboard data.</p>
+          <button
+            onClick={loadDashboard}
+            className="rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </DashLayout>
     );
   }

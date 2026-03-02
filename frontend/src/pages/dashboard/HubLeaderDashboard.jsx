@@ -18,18 +18,39 @@ function Section({ title, children }) {
 export default function HubLeaderDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true);
+    setLoadError(false);
     getHubLeaderStats()
       .then(r => setData(r.data))
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   if (loading) {
     return (
       <DashLayout title="Hub Leader Dashboard">
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
+      </DashLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashLayout title="Hub Leader Dashboard">
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
+          <p className="text-zinc-400">Failed to load hub data. Check your connection.</p>
+          <button
+            onClick={loadData}
+            className="rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </DashLayout>
     );
   }

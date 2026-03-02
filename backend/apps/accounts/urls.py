@@ -7,6 +7,8 @@ from apps.accounts.views import (
     HubLeaderStatsView,
     MemberDashboardView,
     ModeratorStatsView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     ProfileView,
     RegisterView,
     SuperAdminStatsView,
@@ -25,6 +27,8 @@ urlpatterns = [
     path("login/", EmailLoginView.as_view(), name="login"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("verify-email/", VerifyEmailView.as_view(), name="verify_email"),
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
+    path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
 
     # Profile
     path("profile/", ProfileView.as_view(), name="profile"),

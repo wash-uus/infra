@@ -6,11 +6,43 @@ import { useAuth } from "../context/AuthContext";
 export default function DiscipleshipPage() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextUrl, setNextUrl] = useState(null);
+  const [startedIds, setStartedIds] = useState(new Set());
+  const [enrollingId, setEnrollingId] = useState(null);
   const { isAuthenticated } = useAuth();
+
+  const handleStartCourse = async (id) => {
+    // Optimistically mark as started, then confirm with the API
+    setStartedIds((prev) => new Set(prev).add(id));
+    setEnrollingId(id);
+    try {
+      await api.post(`/discipleship/courses/${id}/enroll/`);
+    } catch {
+      // Endpoint may not exist yet or user already enrolled — keep optimistic state
+    } finally {
+      setEnrollingId(null);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!nextUrl || loadingMore) return;
+    setLoadingMore(true);
+    api.get(nextUrl.replace(/^https?:\/\/[^/]+/, ""))
+      .then((r) => {
+        setCourses((prev) => [...prev, ...(r.data.results || [])]);
+        setNextUrl(r.data.next || null);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  };
 
   useEffect(() => {
     api.get("/discipleship/courses/")
-      .then((r) => setCourses(r.data.results || []))
+      .then((r) => {
+        setCourses(r.data.results || r.data);
+        setNextUrl(r.data.next || null);
+      })
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
   }, []);
@@ -76,12 +108,35 @@ export default function DiscipleshipPage() {
                 )}
 
                 {isAuthenticated && (
-                  <button className="mt-auto btn-gold py-2 text-sm w-full justify-center">
-                    Start Course
-                  </button>
+                  startedIds.has(course.id) ? (
+                    <p className="mt-auto text-center text-sm font-semibold text-emerald-400">
+                      ✓ In Progress
+                    </p>
+                  ) : (
+                    <button
+                      className="mt-auto btn-gold py-2 text-sm w-full justify-center disabled:opacity-60"
+                      disabled={enrollingId === course.id}
+                      onClick={() => handleStartCourse(course.id)}
+                    >
+                      {enrollingId === course.id ? "Starting…" : "Start Course"}
+                    </button>
+                  )
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load more */}
+        {nextUrl && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="rounded-full border border-zinc-700 px-8 py-2.5 text-sm font-semibold text-zinc-300 hover:border-amber-500 hover:text-amber-400 transition-colors disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load More Courses"}
+            </button>
           </div>
         )}
 

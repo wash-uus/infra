@@ -19,23 +19,37 @@ export default function ProfilePage() {
   const [data, setData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [loadError, setLoadError] = useState(false);
 
   const showToast = (msg, err = false) => {
     setToast({ msg, err });
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
+  const loadProfile = () => {
+    setLoadError(false);
     api.get("/accounts/profile/")
       .then((r) => setData(r.data))
-      .catch(() => showToast("Failed to load profile", true));
-  }, []);
+      .catch(() => { setLoadError(true); showToast("Failed to load profile", true); });
+  };
+
+  useEffect(() => { loadProfile(); }, []);
 
   return (
     <DashLayout title="My Profile">
       {toast && <Toast {...toast} />}
 
-      {!data ? (
+      {loadError ? (
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
+          <p className="text-zinc-400">Failed to load profile. Check your connection and try again.</p>
+          <button
+            onClick={loadProfile}
+            className="rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      ) : !data ? (
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
       ) : (
         <div className="space-y-6 max-w-4xl">

@@ -33,7 +33,7 @@ SRA reserves the right to suspend or terminate accounts that violate these terms
 **8. Amendments**
 We may update these terms periodically. Continued use of the platform constitutes acceptance of the updated terms.
 
-**Contact:** admin@spiritrevivalafrica.org
+**Contact:** spiritrevivalafrica@gmail.com
     `,
   },
   faith: {

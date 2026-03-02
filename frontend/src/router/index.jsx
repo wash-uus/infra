@@ -15,6 +15,9 @@ import RegisterPage from "../pages/RegisterPage";
 import StoryPage from "../pages/StoryPage";
 import GalleryPage from "../pages/GalleryPage";
 import WorshipPage from "../pages/WorshipPage";
+import NotFoundPage from "../pages/NotFoundPage";
+import VerifyEmailPage from "../pages/VerifyEmailPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
 
 // Role-specific dashboard pages
 import UserDashboard from "../pages/dashboard/UserDashboard";
@@ -110,6 +113,9 @@ export const router = createBrowserRouter([
       },
       { path: "login", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
+      { path: "verify-email", element: <VerifyEmailPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);

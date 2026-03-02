@@ -52,6 +52,7 @@ export default function AdminDashboard() {
   const [rejectReason, setRejectReason] = useState({});
   const [appeals, setAppeals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, err = false) => {
@@ -60,22 +61,26 @@ export default function AdminDashboard() {
   };
 
   // ── Load data ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [s, r, a] = await Promise.all([
-          getAdminStats(),
-          getReviews({ status: "pending" }),
-          getAppeals({ status: "pending" }),
-        ]);
-        setStats(s.data);
-        setReviews(r.data.results ?? r.data);
-        setAppeals(a.data.results ?? a.data);
-      } catch {}
-      setLoading(false);
-    };
-    load();
-  }, []);
+  const load = async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [s, r, a] = await Promise.all([
+        getAdminStats(),
+        getReviews({ status: "pending" }),
+        getAppeals({ status: "pending" }),
+      ]);
+      setStats(s.data);
+      setReviews(r.data.results ?? r.data);
+      setAppeals(a.data.results ?? a.data);
+    } catch {
+      setLoadError(true);
+      showToast("Failed to load dashboard data", true);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
 
   useEffect(() => {
     if (tab !== "Users") return;
@@ -83,7 +88,9 @@ export default function AdminDashboard() {
       try {
         const r = await getUsers({ q: userQuery });
         setUsers(r.data.results ?? r.data);
-      } catch {}
+      } catch {
+        showToast("Failed to load users", true);
+      }
     }, 300);
     return () => clearTimeout(t);
   }, [tab, userQuery]);
@@ -140,6 +147,22 @@ export default function AdminDashboard() {
     return (
       <DashLayout title="Admin Dashboard">
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
+      </DashLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashLayout title="Admin Dashboard">
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-center">
+          <p className="text-zinc-400">Failed to load admin data. Check your connection.</p>
+          <button
+            onClick={load}
+            className="rounded-lg bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </DashLayout>
     );
   }

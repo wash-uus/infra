@@ -11,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from apps.accounts.permissions import (
     IsAdminOrAbove,
@@ -75,6 +76,65 @@ class VerifyEmailView(APIView):
         user.email_verified = True
         user.save(update_fields=["email_verified"])
         return Response({"detail": "Email verified successfully"})
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Password Reset
+# ════════════════════════════════════════════════════════════════════════════
+
+class PasswordResetRequestView(APIView):
+    """Step 1 — send reset email (always returns 200 to prevent email enumeration)."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        if email:
+            user = User.objects.filter(email__iexact=email, is_active=True).first()
+            if user:
+                token = signing.dumps({"user_id": user.id, "purpose": "password_reset"})
+                reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+                send_mail(
+                    subject="Reset your Spirit Revival Africa password",
+                    message=(
+                        f"Hi {user.username},\n\n"
+                        f"Click the link below to reset your password (valid for 1 hour):\n{reset_url}\n\n"
+                        "If you didn't request this, you can safely ignore this email."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+        return Response({"detail": "If that email is registered you will receive a reset link shortly."})
+
+
+class PasswordResetConfirmView(APIView):
+    """Step 2 — receive token + new password and save."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get("token", "")
+        password = request.data.get("password", "")
+        if not token or not password:
+            return Response({"detail": "token and password are required."}, status=400)
+        if len(password) < 8:
+            return Response({"detail": "Password must be at least 8 characters."}, status=400)
+        try:
+            payload = signing.loads(token, max_age=3600)  # 1-hour expiry
+        except signing.SignatureExpired:
+            return Response({"detail": "Reset link has expired. Please request a new one."}, status=400)
+        except signing.BadSignature:
+            return Response({"detail": "Invalid reset token."}, status=400)
+        if payload.get("purpose") != "password_reset":
+            return Response({"detail": "Invalid reset token."}, status=400)
+        user = User.objects.filter(id=payload.get("user_id"), is_active=True).first()
+        if not user:
+            return Response({"detail": "User not found."}, status=404)
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        # Invalidate all existing JWT sessions so old tokens can't be reused
+        for outstanding in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+        return Response({"detail": "Password updated successfully. You can now sign in."})
 
 
 # ════════════════════════════════════════════════════════════════════════════
