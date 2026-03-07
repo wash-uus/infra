@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import DashLayout from "../components/dashboard/DashLayout";
 import EditProfileModal from "../components/profile/EditProfileModal";
-import api from "../api/client";
+import api, { resolveMediaUrl } from "../api/client";
 import { MINISTRY_AREA_LABELS } from "../schemas/signupSchemas";
 
 function Toast({ msg, err }) {
@@ -57,7 +57,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-4">
               {data.profile_picture ? (
                 <img
-                  src={data.profile_picture}
+                  src={resolveMediaUrl(data.profile_picture)}
                   alt="Profile"
                   className="h-16 w-16 rounded-2xl object-cover ring-1 ring-amber-500/30"
                 />

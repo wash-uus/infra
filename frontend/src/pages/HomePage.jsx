@@ -112,6 +112,44 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* FOUNDER */}
+      <section className="mx-auto max-w-5xl px-6 pb-20">
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950">
+          {/* amber glow */}
+          <div className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full bg-amber-500/10 blur-3xl" />
+          <div className="relative flex flex-col items-center gap-8 p-8 sm:flex-row sm:p-12">
+            {/* Photo */}
+            <div className="flex-shrink-0">
+              <div className="h-36 w-36 overflow-hidden rounded-full border-2 border-amber-500/40 shadow-xl shadow-amber-900/30 sm:h-44 sm:w-44">
+                <img src="/washika.jpg" alt="W. Washika" className="h-full w-full object-cover object-top" />
+              </div>
+            </div>
+            {/* Text */}
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-amber-500">Founder & Author</p>
+              <h2 className="mb-3 text-2xl font-black text-white sm:text-3xl">W. Washika</h2>
+              <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
+                A dynamic tele-evangelist from Kakamega County, Kenya, W. Washika founded Spirit Revival Africa at 25 with a burning vision
+                to ignite revival across the continent. Inspired by the likes of Reinhard Bonnke, he balances his calling as a preacher
+                with his career as a land surveyor in Nairobi — a living testimony that faith and life walk hand in hand.
+              </p>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
+                His first published book, <em className="text-amber-300 font-semibold">Beneath the Crown</em>, is now available — a 12-chapter
+                journey from the cross into the throne room of God.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  to="/book/beneath-the-crown"
+                  className="rounded-xl bg-amber-500 hover:bg-amber-400 px-5 py-2.5 text-sm font-bold text-black transition-all hover:scale-105 active:scale-95"
+                >
+                  📖 Get the Book — KSH 600
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section className="mx-auto max-w-7xl px-6 pb-24">
         <div className="mb-14 text-center">

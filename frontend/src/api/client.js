@@ -100,4 +100,16 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Resolve a media path returned by the API to a full absolute URL.
+ * DRF returns absolute URLs when the serializer has request context, but
+ * this helper handles the edge cases where a relative path slips through.
+ */
+export function resolveMediaUrl(path) {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  const mediaBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
+  return `${mediaBase}/media/${path.replace(/^\//, "")}`;
+}
+
 export default api;

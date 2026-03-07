@@ -36,6 +36,7 @@ export default function GroupsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextUrl, setNextUrl] = useState(null);
   const [toast, setToast] = useState(null);
+  const [fetchError, setFetchError] = useState(false);
   const { isAuthenticated } = useAuth();
 
   const showToast = (msg, err = false) => {
@@ -48,8 +49,9 @@ export default function GroupsPage() {
       .then((r) => {
         setGroups(r.data.results || r.data || []);
         setNextUrl(r.data.next || null);
+        setFetchError(false);
       })
-      .catch(() => setGroups([]))
+      .catch(() => { setFetchError(true); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -132,6 +134,18 @@ export default function GroupsPage() {
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => <div key={i} className="h-44 animate-pulse rounded-2xl bg-zinc-900" />)}
+          </div>
+        ) : fetchError ? (
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-16 text-center">
+            <p className="text-4xl mb-3">⚠️</p>
+            <p className="font-semibold text-zinc-400">Could not load groups</p>
+            <p className="mt-1 text-sm text-zinc-600">Check your connection and try again.</p>
+            <button
+              onClick={() => { setFetchError(false); setLoading(true); api.get("/groups/").then(r => { setGroups(r.data.results || r.data || []); setNextUrl(r.data.next || null); }).catch(() => setFetchError(true)).finally(() => setLoading(false)); }}
+              className="mt-5 rounded-lg border border-zinc-700 px-5 py-2 text-sm font-medium text-zinc-300 hover:border-amber-600 hover:text-amber-400 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : groups.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-16 text-center">

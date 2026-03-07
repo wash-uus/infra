@@ -83,7 +83,13 @@ ASGI_APPLICATION = "config.asgi.application"
 
 _db_url = os.getenv("DATABASE_URL", "")
 if _db_url:
-    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
+    DATABASES = {
+        "default": dj_database_url.parse(
+            _db_url,
+            conn_max_age=0,          # let Neon's PgBouncer manage pooling; avoids "connection reset by peer"
+            conn_health_checks=True, # discard stale connections before reuse
+        )
+    }
 else:
     DATABASES = {
         "default": {

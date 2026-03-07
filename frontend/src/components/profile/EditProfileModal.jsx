@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import api from "../../api/client";
+import api, { resolveMediaUrl } from "../../api/client";
 import { COUNTRIES, MINISTRY_AREA_LABELS } from "../../schemas/signupSchemas";
 import BaseModal from "../signup/BaseModal";
 import StepProgressBar from "../signup/StepProgressBar";
@@ -141,7 +141,7 @@ export default function EditProfileModal({ open, profile, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
   const [profilePicFile, setProfilePicFile] = useState(null);
-  const [profilePicPreview, setProfilePicPreview] = useState(profile?.profile_picture || null);
+  const [profilePicPreview, setProfilePicPreview] = useState(resolveMediaUrl(profile?.profile_picture) || null);
   const [formData, setFormData] = useState(() => mapProfileToForm(profile || {}));
 
   const TOTAL_STEPS = 5;
@@ -223,7 +223,7 @@ export default function EditProfileModal({ open, profile, onClose, onSaved }) {
     setFormData(effectiveData);
     setApiError("");
     setProfilePicFile(null);
-    setProfilePicPreview(profile?.profile_picture || null);
+    setProfilePicPreview(resolveMediaUrl(profile?.profile_picture) || null);
     onClose?.();
   };
 

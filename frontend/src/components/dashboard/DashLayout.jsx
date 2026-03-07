@@ -11,12 +11,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getNotifications, getUnreadCount, markAllRead } from "../../api/dashboard";
+import api, { resolveMediaUrl } from "../../api/client";
 import AnnouncementBanner from "../AnnouncementBanner";
 
 // ── Role-specific nav items ──────────────────────────────────────────────────
 const NAV = {
   member: [
-    { to: "/user-dashboard", icon: "⊞", label: "Dashboard" },
+    { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/groups", icon: "👥", label: "My Groups" },
     { to: "/hubs", icon: "🏛", label: "Hubs" },
     { to: "/discipleship", icon: "📖", label: "Courses" },
@@ -24,24 +25,24 @@ const NAV = {
     { to: "/messages", icon: "💬", label: "Messages" },
   ],
   moderator: [
-    { to: "/moderator-dashboard", icon: "⊞", label: "Dashboard" },
+    { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/content", icon: "📄", label: "Content" },
     { to: "/messages", icon: "💬", label: "Messages" },
   ],
   hub_leader: [
-    { to: "/hub-leader-dashboard", icon: "⊞", label: "Dashboard" },
+    { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/hubs", icon: "🏛", label: "All Hubs" },
     { to: "/groups", icon: "👥", label: "Groups" },
     { to: "/messages", icon: "💬", label: "Messages" },
   ],
   admin: [
-    { to: "/admin-dashboard", icon: "⊞", label: "Dashboard" },
+    { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/hubs", icon: "🏛", label: "Hubs" },
     { to: "/content", icon: "📄", label: "Content" },
     { to: "/messages", icon: "💬", label: "Messages" },
   ],
   super_admin: [
-    { to: "/super-admin-dashboard", icon: "⊞", label: "Dashboard" },
+    { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/hubs", icon: "🏛", label: "Hubs" },
     { to: "/content", icon: "📄", label: "Content" },
     { to: "/messages", icon: "💬", label: "Messages" },
@@ -142,6 +143,13 @@ export default function DashLayout({ children, title }) {
   const { user, role, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profilePic, setProfilePic] = useState(null);
+
+  useEffect(() => {
+    api.get("/accounts/profile/")
+      .then(r => setProfilePic(resolveMediaUrl(r.data.profile_picture)))
+      .catch(() => {});
+  }, []);
 
   const navItems = NAV[role] ?? NAV["member"];
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.member;
@@ -177,9 +185,17 @@ export default function DashLayout({ children, title }) {
         {/* Role badge */}
         <div className="px-4 py-4 border-b border-zinc-900">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-bold text-sm">
-              {(user?.email ?? "?")[0].toUpperCase()}
-            </div>
+            {profilePic ? (
+              <img
+                src={profilePic}
+                alt="Profile"
+                className="h-9 w-9 rounded-full object-cover ring-1 ring-amber-500/30 shrink-0"
+              />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-bold text-sm shrink-0">
+                {(user?.email ?? "?")[0].toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-zinc-200">{user?.email ?? "User"}</p>
               <span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${roleColor}`}>

@@ -6,13 +6,9 @@ import SignupModal from "./signup/SignupModal";
 
 const navLinks = [
   { to: "/", label: "Home" },
-  { to: "/content", label: "Content" },
   { to: "/gallery", label: "Gallery" },
-  { to: "/groups", label: "Groups" },
-  { to: "/prayer", label: "Prayer" },
-  { to: "/discipleship", label: "Discipleship" },
-  { to: "/hubs", label: "Hubs" },
   { to: "/worship", label: "Worship" },
+  { to: "/book/beneath-the-crown", label: "📖 The Book" },
 ];
 
 export default function Layout() {

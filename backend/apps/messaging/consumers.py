@@ -6,6 +6,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from apps.messaging.models import DirectMessage, GroupMessage
 from apps.groups.models import GroupMembership
 
+MAX_MESSAGE_LENGTH = 4000  # characters
+
 
 class DirectMessageConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -40,6 +42,9 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
 
         message = data.get("text", "")
         if not message.strip():
+            return
+        if len(message) > MAX_MESSAGE_LENGTH:
+            await self.send(text_data=json.dumps({"error": "Message too long."}))
             return
         msg_id = await self.save_direct_message(message)
         await self.channel_layer.group_send(
@@ -116,6 +121,9 @@ class GroupMessageConsumer(AsyncWebsocketConsumer):
 
         message = data.get("text", "")
         if not message.strip():
+            return
+        if len(message) > MAX_MESSAGE_LENGTH:
+            await self.send(text_data=json.dumps({"error": "Message too long."}))
             return
         msg_id = await self.save_message(message)
         await self.channel_layer.group_send(

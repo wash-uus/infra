@@ -3,6 +3,8 @@ accounts/views.py — Auth + role-based dashboard API endpoints.
 """
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password as _validate_password
+from django.core import exceptions as django_exceptions
 from django.core import signing
 from django.core.mail import send_mail
 from django.db.models import Count
@@ -116,8 +118,10 @@ class PasswordResetConfirmView(APIView):
         password = request.data.get("password", "")
         if not token or not password:
             return Response({"detail": "token and password are required."}, status=400)
-        if len(password) < 8:
-            return Response({"detail": "Password must be at least 8 characters."}, status=400)
+        try:
+            _validate_password(password)
+        except django_exceptions.ValidationError as exc:
+            return Response({"detail": exc.messages}, status=400)
         try:
             payload = signing.loads(token, max_age=3600)  # 1-hour expiry
         except signing.SignatureExpired:
@@ -179,7 +183,7 @@ class MemberDashboardView(APIView):
             completed = total = 0
 
         return Response({
-            "profile": UserSerializer(user).data,
+            "profile": UserSerializer(user, context={"request": request}).data,
             "prayer": {
                 "total": prayer_qs.count(),
                 "engagement": sum(p.prayer_count for p in prayer_qs),
@@ -204,10 +208,10 @@ class ModeratorStatsView(APIView):
     permission_classes = [IsModeratorOrAbove]
 
     def get(self, request):
-        from apps.common.models import AuditLog, ContentReview
+        from apps.common.models import AuditLog, AppealRequest, ContentReview
         return Response({
             "pending_reviews": ContentReview.objects.filter(status="pending").count(),
-            "pending_appeals": __import__("apps.common.models", fromlist=["AppealRequest"]).AppealRequest.objects.filter(status="pending").count(),
+            "pending_appeals": AppealRequest.objects.filter(status="pending").count(),
             "my_recent_actions": list(
                 AuditLog.objects.filter(actor=request.user).values(
                     "action", "target_model", "target_id", "created_at"
