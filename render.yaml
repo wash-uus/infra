@@ -1,25 +1,34 @@
+databases:
+  - name: sra-db
+    databaseName: sra_db
+    user: sra_user
+    plan: free
+
 services:
   - type: web
     name: sra-backend
     runtime: python
+    plan: free
     rootDir: backend
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input"
     startCommand: "python manage.py migrate --no-input && daphne -b 0.0.0.0 -p $PORT config.asgi:application"
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: sra-db
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
-        sync: false
+        value: "sra-backend.onrender.com"
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
+        value: "https://spirit-revival.vercel.app"
       - key: FRONTEND_URL
-        sync: false
+        value: "https://spirit-revival.vercel.app"
       - key: MEDIA_STORAGE
-        value: "cloudinary"
+        value: "local"
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
