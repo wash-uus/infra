@@ -22,10 +22,10 @@ services:
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
+        value: ".onrender.com,api.spiritrevivalafrica.com"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://spirit-revival.vercel.app"
+        value: "https://spiritrevivalafrica.com,https://www.spiritrevivalafrica.com"
       - key: FRONTEND_URL
-        value: "https://spirit-revival.vercel.app"
+        value: "https://spiritrevivalafrica.com"
       - key: MEDIA_STORAGE
         value: "local"
