@@ -204,7 +204,11 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # cPanel / Truehost terminate SSL at the proxy — forwarding X-Forwarded-Proto.
+    # Setting SECURE_PROXY_SSL_HEADER lets Django trust the header;
+    # SECURE_SSL_REDIRECT is disabled so Apache handles the redirect, not Django.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = False  # Apache/.htaccess handles this on Truehost
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000          # 1 year
