@@ -7,6 +7,8 @@ Common API views:
   - AppealCreateView      — authenticated users
   - AppealReviewView      — admin/super_admin
 """
+import logging
+
 from django.db import models
 from django.utils import timezone
 from rest_framework import generics, permissions, status
@@ -24,6 +26,8 @@ from apps.common.serializers import (
     ReviewActionSerializer,
 )
 from apps.common.utils import get_client_ip, log_action, send_notification
+
+logger = logging.getLogger(__name__)
 
 
 # ── Announcements ────────────────────────────────────────────────────────────
@@ -54,6 +58,33 @@ class NotificationListView(generics.ListAPIView):
         """Mark all notifications as read."""
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({"detail": "All marked as read"})
+
+
+# ── Platform Statistics (public) ────────────────────────────────────────────
+
+class PlatformStatsView(APIView):
+    """Public endpoint — returns live platform counts for the homepage."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.contrib.auth import get_user_model
+        from apps.groups.models import RevivalGroup
+        from apps.prayer.models import PrayerRequest
+        from apps.content.models import ContentItem
+
+        User = get_user_model()
+        nations = (
+            User.objects.exclude(country="")
+            .values_list("country", flat=True)
+            .distinct()
+            .count()
+        )
+        return Response({
+            "nations_count": nations or 0,
+            "groups_count": RevivalGroup.objects.count(),
+            "users_count": User.objects.filter(is_active=True).count(),
+            "testimonies_count": ContentItem.objects.filter(type="wisdom").count(),
+        })
 
 
 class NotificationUnreadCountView(APIView):
@@ -169,7 +200,10 @@ class ReviewActionView(APIView):
                 final = "active" if new_status == "published" else "rejected"
                 RevivalHub.objects.filter(pk=review.target_id).update(status=final)
         except Exception:
-            pass
+            logger.exception(
+                "_set_target_status failed: type=%s id=%s new_status=%s",
+                review.target_type, review.target_id, new_status,
+            )
 
 
 # ── Appeals ───────────────────────────────────────────────────────────────────

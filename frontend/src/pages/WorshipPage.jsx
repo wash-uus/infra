@@ -131,7 +131,8 @@ function TrackCard({ track }) {
 /* ── Main Page ───────────────────────────────────────────────── */
 export default function WorshipPage() {
   const { user } = useAuth();
-  const [team, setTeam] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("about");
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -140,12 +141,15 @@ export default function WorshipPage() {
     getWorshipTeams()
       .then((r) => {
         const results = r.data.results ?? r.data;
-        setTeam(Array.isArray(results) ? results[0] : null);
+        const list = Array.isArray(results) ? results : [];
+        setTeams(list);
+        if (list.length > 0) setSelectedTeamId(list[0].id);
       })
-      .catch(() => setTeam(null))
+      .catch(() => setTeams([]))
       .finally(() => setLoading(false));
   }, []);
 
+  const team = teams.find((t) => t.id === selectedTeamId) ?? null;
   const vocalists = team?.members?.filter((m) => m.role === "vocalist") ?? [];
   const instrumentalists = team?.members?.filter((m) => m.role === "instrumentalist") ?? [];
   const tracks = team?.tracks ?? [];
@@ -189,13 +193,31 @@ export default function WorshipPage() {
 
         {loading ? (
           <div className="h-52 animate-pulse rounded-3xl bg-zinc-900" />
-        ) : !team ? (
+        ) : teams.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-20 text-center">
             <p className="text-5xl mb-4">🎵</p>
-            <p className="font-bold text-zinc-300 text-lg">Worship team data unavailable</p>
+            <p className="font-bold text-zinc-300 text-lg">Worship teams are being prepared. Check back soon.</p>
           </div>
         ) : (
           <>
+            {/* ── Team selector (only shown when multiple teams exist) ── */}
+            {teams.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                {teams.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelectedTeamId(t.id); setActiveTab("about"); }}
+                    className={`shrink-0 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${
+                      selectedTeamId === t.id
+                        ? "border-amber-500 bg-amber-500/10 text-amber-300"
+                        : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
             {/* ── Hero cover ───────────────────────────── */}
             <div className="relative overflow-hidden rounded-3xl border border-zinc-800">
               {team.cover_photo_url
@@ -266,7 +288,7 @@ export default function WorshipPage() {
             {/* ── CTA strip ────────────────────────────── */}
             <div className="flex flex-col sm:flex-row gap-4 rounded-2xl border border-amber-500/15 bg-gradient-to-r from-amber-950/20 via-zinc-950 to-purple-950/20 px-7 py-5 items-center justify-between">
               <div>
-                <p className="font-black text-white text-base">Want to be part of Shouts of Joy Melodies?</p>
+                <p className="font-black text-white text-base">Want to be part of {team.name}?</p>
                 <p className="text-xs text-zinc-500 mt-0.5">We welcome vocalists and instrumentalists who carry a heart for Spirit-filled worship.</p>
               </div>
               <div className="flex gap-3 shrink-0 flex-wrap">
@@ -316,7 +338,7 @@ export default function WorshipPage() {
                       <div>
                         <p className="text-sm font-semibold text-amber-300 mb-1">Independent Worship Ministry</p>
                         <p className="text-xs text-zinc-500 leading-relaxed">
-                          Shouts of Joy Melodies operates as an independent worship team within the Spirit Revival Africa
+                          {team.name} operates as an independent worship team within the Spirit Revival Africa
                           movement. Comprising both <strong className="text-zinc-400">instrumentalists</strong> and{" "}
                           <strong className="text-zinc-400">vocalists</strong>, the team is dedicated to Spirit-filled
                           worship that carries revival across Africa and the nations.
@@ -402,7 +424,7 @@ function JoinModal({ team, onClose, user }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-950/60 via-zinc-950 to-purple-950/40 px-7 pt-7 pb-5 border-b border-zinc-800">
           <button onClick={onClose} className="absolute top-4 right-5 text-zinc-500 hover:text-zinc-300 text-xl transition">✕</button>
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-1">Shouts of Joy Melodies</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-1">{team?.name}</p>
           <h2 className="text-xl font-black text-white">Join the Worship Team</h2>
           <p className="text-xs text-zinc-500 mt-1">Fill in your details — the team will review and reach out to you.</p>
         </div>
@@ -412,7 +434,7 @@ function JoinModal({ team, onClose, user }) {
             <p className="text-5xl">🙌</p>
             <p className="text-lg font-black text-white">Request Submitted!</p>
             <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-              Your application has been received. The Shouts of Joy Melodies team will be in touch soon. Keep worshipping!
+              Your application has been received. The {team?.name} team will be in touch soon. Keep worshipping!
             </p>
             <button onClick={onClose} className="btn-gold px-8 py-2.5 text-sm mt-2">Close</button>
           </div>
@@ -460,7 +482,7 @@ function JoinModal({ team, onClose, user }) {
             )}
             <div>
               <label className="mb-1 block text-xs font-semibold text-zinc-400 uppercase tracking-wide">Why do you want to join? <span className="text-zinc-600 normal-case font-normal">(optional)</span></label>
-              <textarea value={form.message} onChange={(e) => set("message", e.target.value)} rows={3} maxLength={500} placeholder="Share your heart — what draws you to Shouts of Joy Melodies?" className="input-dark resize-none" />
+              <textarea value={form.message} onChange={(e) => set("message", e.target.value)} rows={3} maxLength={500} placeholder={`Share your heart — what draws you to ${team?.name}?`} className="input-dark resize-none" />
               <p className="mt-1 text-right text-[10px] text-zinc-600">{form.message.length}/500</p>
             </div>
             <div className="pt-1 flex justify-end gap-3">

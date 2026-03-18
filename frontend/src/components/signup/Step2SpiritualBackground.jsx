@@ -143,10 +143,10 @@ export default function Step2SpiritualBackground({ defaultValues, onNext }) {
           {...register("testimony")}
           rows={3}
           placeholder="Share briefly how God has worked in your life…"
-          maxLength={500}
+          maxLength={1000}
           className="input-dark resize-none"
         />
-        <div className="mt-1 text-right text-[10px] text-zinc-600">{watch("testimony")?.length || 0}/500</div>
+        <div className="mt-1 text-right text-[10px] text-zinc-600">{watch("testimony")?.length || 0}/1000</div>
         <FieldError message={errors.testimony?.message} />
       </div>
     </form>

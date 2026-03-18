@@ -108,8 +108,8 @@ api.interceptors.response.use(
 export function resolveMediaUrl(path) {
   if (!path) return null;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  const mediaBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/api\/?$/, "");
-  return `${mediaBase}/media/${path.replace(/^\//, "")}`;
+  const mediaBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/api\/?$/, "");
+  return mediaBase ? `${mediaBase}/media/${path.replace(/^\//, "")}` : path;
 }
 
 export default api;

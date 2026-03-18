@@ -3,7 +3,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import (
     AdminStatsView,
+    ChangePasswordView,
     EmailLoginView,
+    GoogleAuthView,
     HubLeaderStatsView,
     MemberDashboardView,
     ModeratorStatsView,
@@ -14,6 +16,7 @@ from apps.accounts.views import (
     SuperAdminStatsView,
     UserDetailView,
     UserListView,
+    UserSearchView,
     VerifyEmailView,
     promote_user_role,
     reactivate_user,
@@ -25,6 +28,7 @@ urlpatterns = [
     # Auth
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", EmailLoginView.as_view(), name="login"),
+    path("auth/google/", GoogleAuthView.as_view(), name="google_auth"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("verify-email/", VerifyEmailView.as_view(), name="verify_email"),
     path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
@@ -32,6 +36,7 @@ urlpatterns = [
 
     # Profile
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 
     # Role dashboards
     path("dashboard/me/", MemberDashboardView.as_view(), name="member_dashboard"),
@@ -46,6 +51,7 @@ urlpatterns = [
     path("users/<int:user_id>/promote/", promote_user_role, name="promote_user"),
     path("users/<int:user_id>/suspend/", suspend_user, name="suspend_user"),
     path("users/<int:user_id>/reactivate/", reactivate_user, name="reactivate_user"),
+    path("users/search/", UserSearchView.as_view(), name="user_search"),
 
     # Legacy compat
     path("site-stats/", site_statistics, name="site_statistics"),

@@ -3,6 +3,8 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 import Layout from "../components/Layout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import ContentPage from "../pages/ContentPage";
+import CoursePage from "../pages/CoursePage";
+import LessonPage from "../pages/LessonPage";
 import DiscipleshipPage from "../pages/DiscipleshipPage";
 import GroupsPage from "../pages/GroupsPage";
 import HomePage from "../pages/HomePage";
@@ -48,6 +50,8 @@ export const router = createBrowserRouter([
       },
       { path: "prayer", element: <PrayerPage /> },
       { path: "discipleship", element: <DiscipleshipPage /> },
+      { path: "discipleship/course/:courseId", element: <CoursePage /> },
+      { path: "discipleship/course/:courseId/lesson/:lessonId", element: <LessonPage /> },
       { path: "hubs", element: <HubsPage /> },
       { path: "worship", element: <WorshipPage /> },
       { path: "book/beneath-the-crown", element: <BeneathTheCrownPage /> },

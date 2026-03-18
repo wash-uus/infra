@@ -1,6 +1,8 @@
 """
 accounts/views.py — Auth + role-based dashboard API endpoints.
 """
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password as _validate_password
@@ -11,9 +13,12 @@ from django.db.models import Count
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+logger = logging.getLogger(__name__)
 
 from apps.accounts.permissions import (
     IsAdminOrAbove,
@@ -84,9 +89,16 @@ class VerifyEmailView(APIView):
 # Password Reset
 # ════════════════════════════════════════════════════════════════════════════
 
+class PasswordResetThrottle(AnonRateThrottle):
+    """Strict per-IP rate limit for password reset requests."""
+    rate = "5/hour"
+    scope = "password_reset"
+
+
 class PasswordResetRequestView(APIView):
     """Step 1 — send reset email (always returns 200 to prevent email enumeration)."""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
@@ -172,6 +184,7 @@ class MemberDashboardView(APIView):
                 "group__id", "group__name", "joined_at"
             )[:20])
         except Exception:
+            logger.exception("MemberDashboardView: failed to load groups for user %s", user.id)
             groups = []
 
         try:
@@ -180,6 +193,7 @@ class MemberDashboardView(APIView):
             completed = progress.filter(completed=True).count()
             total = progress.count()
         except Exception:
+            logger.exception("MemberDashboardView: failed to load lesson progress for user %s", user.id)
             completed = total = 0
 
         return Response({
@@ -428,4 +442,165 @@ def reactivate_user(request, user_id):
 @permission_classes([IsAdminOrAbove])
 def site_statistics(request):
     return AdminStatsView().get(request)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Change Password  (authenticated users)
+# ════════════════════════════════════════════════════════════════════════════
+
+class ChangePasswordView(APIView):
+    """POST {current_password, new_password} — changes password for the authenticated user."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        current = request.data.get("current_password", "")
+        new_pw = request.data.get("new_password", "")
+        if not current or not new_pw:
+            return Response({"detail": "current_password and new_password are required."}, status=400)
+        user = request.user
+        if not user.check_password(current):
+            return Response({"detail": "Current password is incorrect."}, status=400)
+        try:
+            _validate_password(new_pw, user=user)
+        except django_exceptions.ValidationError as exc:
+            return Response({"detail": exc.messages}, status=400)
+        user.set_password(new_pw)
+        user.save(update_fields=["password"])
+        # Invalidate all active JWT sessions except implicitly — client must re-login.
+        for outstanding in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+        return Response({"detail": "Password changed successfully. Please sign in again."})
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# User Search  (authenticated users — for messaging/DM)
+# ════════════════════════════════════════════════════════════════════════════
+
+class UserSearchView(generics.ListAPIView):
+    """GET /api/accounts/users/search/?q=<query> — returns matching active users."""
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        from django.db.models import Q
+        q = self.request.query_params.get("q", "").strip()
+        if not q or len(q) < 2:
+            return User.objects.none()
+        return (
+            User.objects.filter(is_active=True)
+            .filter(
+                Q(full_name__icontains=q)
+                | Q(username__icontains=q)
+                | Q(email__icontains=q)
+            )
+            .exclude(id=self.request.user.id)
+            .order_by("full_name")[:20]
+        )
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        data = [
+            {
+                "id": u.id,
+                "full_name": u.full_name or u.username,
+                "username": u.username,
+                "email": u.email,
+                "profile_picture": (
+                    request.build_absolute_uri(u.profile_picture.url)
+                    if u.profile_picture
+                    else None
+                ),
+            }
+            for u in qs
+        ]
+        return Response(data)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Google OAuth  — exchange a Google ID token for SRA JWT tokens
+# ════════════════════════════════════════════════════════════════════════════
+
+class GoogleAuthView(APIView):
+    """
+    POST { credential, email, name, given_name, family_name, email_verified, sub }
+    Accepts a Google OAuth2 access token, verifies user info, finds or creates
+    the SRA user, and returns access + refresh JWT tokens.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        import requests as http_requests
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        client_id = settings.GOOGLE_CLIENT_ID
+        if not client_id:
+            return Response({"detail": "Google login is not configured on this server."}, status=503)
+
+        # The frontend sends either an access_token (OAuth2 flow) or credential (ID token flow).
+        # We support the access_token path: verify by calling Google's tokeninfo endpoint.
+        access_token = request.data.get("credential", "").strip()
+        if not access_token:
+            return Response({"detail": "No credential provided."}, status=400)
+
+        # Verify the token with Google's tokeninfo API
+        try:
+            resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v3/tokeninfo",
+                params={"access_token": access_token},
+                timeout=10,
+            )
+        except Exception:
+            return Response({"detail": "Could not reach Google servers."}, status=503)
+
+        if resp.status_code != 200:
+            return Response({"detail": "Invalid or expired Google token."}, status=400)
+
+        token_info = resp.json()
+
+        # Verify the token was issued for our client
+        if token_info.get("aud") != client_id and token_info.get("azp") != client_id:
+            return Response({"detail": "Google token audience mismatch."}, status=400)
+
+        email = (token_info.get("email") or request.data.get("email", "")).lower().strip()
+        if not email:
+            return Response({"detail": "Google account has no email address."}, status=400)
+
+        email_verified = token_info.get("email_verified") == "true" or request.data.get("email_verified", False)
+        if not email_verified:
+            return Response({"detail": "Google email is not verified."}, status=400)
+
+        # Find or create user
+        user = User.objects.filter(email=email).first()
+        if user is None:
+            import random, string as _string
+            given_name = request.data.get("given_name", "")
+            family_name = request.data.get("family_name", "")
+            full_name = request.data.get("name", "") or f"{given_name} {family_name}".strip() or email.split("@")[0]
+            base = email.split("@")[0].lower()
+            base = "".join(c if c.isalnum() or c == "_" else "_" for c in base)[:20] or "user"
+            suffix = "".join(random.choices(_string.digits, k=4))
+            username = f"{base}_{suffix}"
+            attempt = 0
+            while User.objects.filter(username=username).exists() and attempt < 10:
+                suffix = "".join(random.choices(_string.digits, k=4))
+                username = f"{base}_{suffix}"
+                attempt += 1
+            user = User.objects.create_user(
+                email=email,
+                username=username,
+                full_name=full_name,
+                password=None,  # no password — OAuth only
+                email_verified=True,
+                is_active=True,
+            )
+
+        elif not user.is_active:
+            return Response({"detail": "This account has been suspended."}, status=403)
+
+        # Issue JWT tokens
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        })
 

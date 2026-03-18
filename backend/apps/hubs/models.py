@@ -30,3 +30,6 @@ class HubMembership(models.Model):
 
     class Meta:
         unique_together = ("user", "hub")
+
+    def __str__(self):
+        return f"{self.user} @ {self.hub}"

@@ -15,6 +15,69 @@ function Toast({ msg, err }) {
   );
 }
 
+function ChangePasswordSection({ showToast }) {
+  const [form, setForm] = useState({ current_password: "", new_password: "", confirm: "" });
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!form.current_password) e.current_password = "Required.";
+    if (form.new_password.length < 8) e.new_password = "Must be at least 8 characters.";
+    if (form.new_password !== form.confirm) e.confirm = "Passwords do not match.";
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setErrors({});
+    setSaving(true);
+    try {
+      await api.post("/accounts/change-password/", {
+        current_password: form.current_password,
+        new_password: form.new_password,
+      });
+      setForm({ current_password: "", new_password: "", confirm: "" });
+      showToast("Password changed successfully.");
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.response?.data?.current_password?.[0] || "Failed to change password.";
+      showToast(msg, true);
+    } finally { setSaving(false); }
+  };
+
+  const field = (key, label, placeholder) => (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-zinc-500">{label}</label>
+      <input
+        type="password"
+        value={form[key]}
+        onChange={(e) => { setForm((p) => ({ ...p, [key]: e.target.value })); setErrors((p) => ({ ...p, [key]: "" })); }}
+        placeholder={placeholder}
+        className={`input-dark ${errors[key] ? "border-red-500" : ""}`}
+      />
+      {errors[key] && <p className="text-xs text-red-400">{errors[key]}</p>}
+    </div>
+  );
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 mb-4">Change Password</p>
+      <form onSubmit={handleSubmit} className="space-y-3 max-w-sm">
+        {field("current_password", "Current Password", "Enter current password")}
+        {field("new_password", "New Password", "At least 8 characters")}
+        {field("confirm", "Confirm New Password", "Repeat new password")}
+        <div className="pt-1">
+          <button type="submit" disabled={saving} className="btn-gold py-2 px-6 text-sm disabled:opacity-60">
+            {saving ? "Saving…" : "Update Password"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [data, setData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -109,6 +172,8 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          <ChangePasswordSection showToast={showToast} />
         </div>
       )}
 

@@ -4,6 +4,8 @@ from django.core import signing
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import json
+import random
+import string
 
 User = get_user_model()
 
@@ -37,6 +39,16 @@ class UserSerializer(serializers.ModelSerializer):
             except json.JSONDecodeError:
                 mutable["ministry_areas"] = []
         return super().to_internal_value(mutable)
+
+    def update(self, instance, validated_data):
+        old_pic_name = instance.profile_picture.name if instance.profile_picture else None
+        instance = super().update(instance, validated_data)
+        new_pic_name = instance.profile_picture.name if instance.profile_picture else None
+        if old_pic_name and new_pic_name != old_pic_name:
+            from django.core.files.storage import default_storage
+            if default_storage.exists(old_pic_name):
+                default_storage.delete(old_pic_name)
+        return instance
 
 
 class AdminUserSerializer(serializers.ModelSerializer):
@@ -98,6 +110,39 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         password = validated_data.pop("password")
 
+        # ── Validate profile picture ──────────────────────────────────────────
+        pic = validated_data.get("profile_picture")
+        if pic:
+            allowed_types = {"image/jpeg", "image/png", "image/webp"}
+            content_type = getattr(pic, "content_type", "")
+            if content_type not in allowed_types:
+                raise serializers.ValidationError(
+                    {"profile_picture": "Only JPEG, PNG, or WebP images are allowed."}
+                )
+            if pic.size > 2 * 1024 * 1024:  # 2 MB
+                raise serializers.ValidationError(
+                    {"profile_picture": "Profile picture must be under 2 MB."}
+                )
+
+        # ── Safe username generation ──────────────────────────────────────────
+        raw_username = validated_data.get("username", "")
+        if not raw_username:
+            email = validated_data.get("email", "")
+            base = email.split("@")[0].lower()
+            # Strip non-alphanumeric/underscore chars
+            base = "".join(c if c.isalnum() or c == "_" else "_" for c in base)[:20]
+            base = base or "user"
+        else:
+            base = raw_username
+        # Ensure uniqueness
+        suffix = "".join(random.choices(string.digits, k=4))
+        candidate = f"{base}_{suffix}"
+        attempt = 0
+        while User.objects.filter(username=candidate).exists() and attempt < 10:
+            suffix = "".join(random.choices(string.digits, k=4))
+            candidate = f"{base}_{suffix}"
+            attempt += 1
+        validated_data["username"] = candidate
         validated_data["born_again"] = spiritual.get("born_again", "")
         year = spiritual.get("year_of_salvation")
         validated_data["year_of_salvation"] = int(year) if str(year).isdigit() else None

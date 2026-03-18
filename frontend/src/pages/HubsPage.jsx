@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -25,11 +26,11 @@ export default function HubsPage() {
   const [nextUrl, setNextUrl] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", country: "", city: "", description: "", meeting_schedule: "" });
+  const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [applyError, setApplyError] = useState("");
   const [toast, setToast] = useState(null);
-  const [joinedIds, setJoinedIds] = useState(new Set());
   const { isAuthenticated } = useAuth();
 
   const showToast = (msg, err = false) => {
@@ -62,17 +63,40 @@ export default function HubsPage() {
     if (!isAuthenticated) return;
     try {
       await api.post(`/hubs/${id}/join/`);
-      setJoinedIds((prev) => new Set(prev).add(id));
-      setSuccess("You have joined this hub! Welcome to the network.");
-      setTimeout(() => setSuccess(""), 4000);
+      setHubs((prev) => prev.map((h) => h.id === id ? { ...h, is_member: true, member_count: (h.member_count || 0) + 1 } : h));
+      showToast("You have joined this hub! Welcome to the network.");
     } catch (err) {
       const msg = err?.response?.data?.detail || "Failed to join hub. Please try again.";
       showToast(msg, true);
     }
   };
 
+  const handleLeave = async (id) => {
+    if (!isAuthenticated) return;
+    try {
+      await api.post(`/hubs/${id}/leave/`);
+      setHubs((prev) => prev.map((h) => h.id === id ? { ...h, is_member: false, member_count: Math.max(0, (h.member_count || 1) - 1) } : h));
+      showToast("You have left the hub.");
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Failed to leave hub. Please try again.";
+      showToast(msg, true);
+    }
+  };
+
+  const validateForm = () => {
+    const errs = {};
+    if (!form.name.trim()) errs.name = "Hub name is required.";
+    if (!form.country.trim()) errs.country = "Country is required.";
+    if (!form.city.trim()) errs.city = "City is required.";
+    if (!form.description.trim()) errs.description = "Please describe your hub vision.";
+    return errs;
+  };
+
   const handleApply = async (e) => {
     e.preventDefault();
+    const errs = validateForm();
+    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    setFormErrors({});
     setSubmitting(true);
     setApplyError("");
     try {
@@ -124,9 +148,15 @@ export default function HubsPage() {
               { key: "city", placeholder: "City" },
               { key: "meeting_schedule", placeholder: "Meeting schedule (e.g. Sundays 6pm)" },
             ].map(({ key, placeholder }) => (
-              <input key={key} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} className="input-dark" />
+              <div key={key} className="flex flex-col gap-1">
+                <input value={form[key]} onChange={(e) => { setForm((p) => ({ ...p, [key]: e.target.value })); setFormErrors((p) => ({ ...p, [key]: "" })); }} placeholder={placeholder} className={`input-dark ${formErrors[key] ? "border-red-500" : ""}`} />
+                {formErrors[key] && <p className="text-xs text-red-400">{formErrors[key]}</p>}
+              </div>
             ))}
-            <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Describe your hub vision…" rows={3} className="input-dark col-span-full resize-none" />
+            <div className="col-span-full flex flex-col gap-1">
+              <textarea value={form.description} onChange={(e) => { setForm((p) => ({ ...p, description: e.target.value })); setFormErrors((p) => ({ ...p, description: "" })); }} placeholder="Describe your hub vision…" rows={3} className={`input-dark resize-none ${formErrors.description ? "border-red-500" : ""}`} />
+              {formErrors.description && <p className="text-xs text-red-400">{formErrors.description}</p>}
+            </div>
             {applyError && (
               <p className="col-span-full text-sm text-red-400">{applyError}</p>
             )}
@@ -177,23 +207,28 @@ export default function HubsPage() {
                   </p>
                 )}
 
-                <div className="mt-auto border-t border-zinc-800 pt-3">
-                  {isAuthenticated && hub.status === "approved" && (
-                    joinedIds.has(hub.id) ? (
-                      <p className="w-full text-center py-2 text-xs font-semibold text-emerald-400">
-                        ✓ Joined
-                      </p>
-                    ) : (
-                      <button onClick={() => handleJoin(hub.id)} className="w-full btn-outline py-2 text-xs justify-center">
-                        Join Hub
-                      </button>
-                    )
+                <div className="mt-auto flex items-center justify-between border-t border-zinc-800 pt-3">
+                  {hub.member_count !== undefined && hub.member_count !== null && (
+                    <span className="text-xs text-zinc-600">{hub.member_count} member{hub.member_count !== 1 ? "s" : ""}</span>
                   )}
-                  {!isAuthenticated && hub.status === "approved" && (
-                    <a href="/login" className="block w-full text-center py-2 text-xs text-zinc-500 hover:text-amber-400 transition-colors">
-                      Sign in to join
-                    </a>
-                  )}
+                  <div className="ml-auto">
+                    {isAuthenticated && hub.status === "approved" && (
+                      hub.is_member ? (
+                        <button onClick={() => handleLeave(hub.id)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-400 transition hover:border-red-500/40 hover:text-red-400">
+                          Leave Hub
+                        </button>
+                      ) : (
+                        <button onClick={() => handleJoin(hub.id)} className="btn-outline py-1.5 px-3 text-xs justify-center">
+                          Join Hub
+                        </button>
+                      )
+                    )}
+                    {!isAuthenticated && hub.status === "approved" && (
+                      <Link to="/login" state={{ from: { pathname: "/hubs" } }} className="block text-center py-1.5 px-3 text-xs text-zinc-500 hover:text-amber-400 transition-colors">
+                        Sign in to join
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

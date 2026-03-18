@@ -337,12 +337,14 @@ function MemberView({ data }) {
                 </Link>
               </>
             ) : (
-              <>
-                <p className="text-sm text-zinc-500 mb-3">No hub membership yet.</p>
-                <Link to="/hubs" className="inline-flex items-center rounded-lg border border-amber-800/40 px-3.5 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 p-4 text-center">
+                <p className="text-2xl mb-2">🔥</p>
+                <p className="text-sm font-semibold text-zinc-200 mb-1">Join a Revival Hub near you</p>
+                <p className="text-xs text-zinc-500 mb-3">Find or pioneer a revival centre in your city.</p>
+                <Link to="/hubs" className="inline-flex items-center rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-black hover:bg-amber-400 transition-colors">
                   Browse Revival Hubs →
                 </Link>
-              </>
+              </div>
             )}
           </Section>
         </div>
@@ -478,7 +480,7 @@ function ModeratorView({ stats, reviews, onReviewAction }) {
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
                   {stats.my_recent_actions.map((e, i) => (
-                    <tr key={i}>
+                    <tr key={e.id ?? `${e.action}-${e.created_at}-${i}`}>
                       <td className="py-2.5 pr-4 font-mono text-xs text-zinc-300">{e.action}</td>
                       <td className="py-2.5 pr-4 text-xs text-zinc-500">
                         {e.target_model}{e.target_id ? ` #${e.target_id}` : ""}

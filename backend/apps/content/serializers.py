@@ -55,6 +55,19 @@ class ContentItemSerializer(serializers.ModelSerializer):
         name = value.name.lower()
         if not any(name.endswith(ext) for ext in allowed_extensions):
             raise serializers.ValidationError("Unsupported media type")
+        # Enforce upload size limits per type
+        max_bytes = 50 * 1024 * 1024  # 50 MB default
+        if name.endswith(".mp3"):
+            max_bytes = 30 * 1024 * 1024  # 30 MB for audio
+        elif name.endswith((".mp4", ".mov")):
+            max_bytes = 200 * 1024 * 1024  # 200 MB for video
+        elif name.endswith(".pdf"):
+            max_bytes = 20 * 1024 * 1024  # 20 MB for PDFs
+        if value.size > max_bytes:
+            raise serializers.ValidationError(
+                f"File too large ({value.size / 1024 / 1024:.1f} MB). "
+                f"Maximum allowed: {max_bytes // (1024 * 1024)} MB."
+            )
         return value
 
 

@@ -9,9 +9,11 @@ from .views import (
     AppealCreateView,
     AppealListView,
     AppealResolveView,
+    PlatformStatsView,
 )
 
 urlpatterns = [
+    path("platform-stats/", PlatformStatsView.as_view(), name="platform-stats"),
     path("announcements/", AnnouncementPublicListView.as_view(), name="announcements"),
     path("notifications/", NotificationListView.as_view(), name="notifications"),
     path("notifications/unread/", NotificationUnreadCountView.as_view(), name="notif-unread"),

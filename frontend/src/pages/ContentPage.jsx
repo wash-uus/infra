@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import api from "../api/client";
 
@@ -207,14 +208,23 @@ function ContentCard({ item }) {
 
 /* -- Page ---------------------------------------------------------------- */
 export default function ContentPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextUrl, setNextUrl] = useState(null);
-  const [activeType, setActiveType] = useState("");
-  const [search, setSearch] = useState("");
+  const [activeType, setActiveType] = useState(searchParams.get("type") || "");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
   const [counts, setCounts] = useState({});
   const debounceRef = useRef(null);
+
+  // Sync state changes back to URL
+  useEffect(() => {
+    const p = {};
+    if (activeType) p.type = activeType;
+    if (search.trim()) p.search = search.trim();
+    setSearchParams(p, { replace: true });
+  }, [activeType, search, setSearchParams]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);

@@ -1,8 +1,11 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+import logging
 import requests
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +223,7 @@ class DailyBread(models.Model):
             try:
                 fetched = self._fetch_verse_text()
             except Exception:
+                logger.exception("DailyBread.save: verse fetch failed for pk=%s", self.pk)
                 fetched = ""
             if fetched:
                 self.verse_text = fetched

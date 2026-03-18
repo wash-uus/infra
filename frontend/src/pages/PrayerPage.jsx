@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -12,7 +13,10 @@ export default function PrayerPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ title: "", description: "" });
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get("/prayer/requests/")
@@ -36,12 +40,37 @@ export default function PrayerPage() {
   };
 
   const handlePray = async (id) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: { pathname: "/prayer" } } });
+      return;
+    }
     try {
       const r = await api.post(`/prayer/requests/${id}/prayed/`);
       setRequests((prev) =>
         prev.map((p) => (p.id === id ? { ...p, prayer_count: r.data.prayer_count } : p))
       );
+    } catch { /* noop */ }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this prayer request?")) return;
+    try {
+      await api.delete(`/prayer/requests/${id}/`);
+      setRequests((prev) => prev.filter((p) => p.id !== id));
+    } catch { /* noop */ }
+  };
+
+  const startEdit = (req) => {
+    setEditingId(req.id);
+    setEditForm({ title: req.title, description: req.description });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api.patch(`/prayer/requests/${editingId}/`, editForm);
+      setRequests((prev) => prev.map((p) => (p.id === editingId ? r.data : p)));
+      setEditingId(null);
     } catch { /* noop */ }
   };
 
@@ -93,6 +122,7 @@ export default function PrayerPage() {
                 placeholder="Share your prayer need in detail…"
                 rows={3}
                 required
+                minLength={10}
                 className="input-dark resize-none"
               />
               <div className="flex items-center gap-3">
@@ -138,29 +168,74 @@ export default function PrayerPage() {
           <div className="space-y-4">
             {requests.map((req) => (
               <div key={req.id} className="card group flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-white">{req.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-500 line-clamp-3">{req.description}</p>
-                  </div>
-                  {!req.is_public && <span className="badge-zinc shrink-0">Private</span>}
-                </div>
-                <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
-                  <span className="text-xs text-zinc-600">
-                    {new Date(req.created_at).toLocaleDateString()}
-                  </span>
-                  <button
-                    onClick={() =>
-                      isAuthenticated
-                        ? handlePray(req.id)
-                        : (window.location.assign("/login"))
-                    }
-                    title={!isAuthenticated ? "Sign in to pray" : undefined}
-                    className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
-                  >
-                    🙏 {isAuthenticated ? `Prayed · ${req.prayer_count}` : "Pray"}
-                  </button>
-                </div>
+                {editingId === req.id ? (
+                  <form onSubmit={handleEditSubmit} className="space-y-3">
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                      required
+                      className="input-dark"
+                    />
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                      rows={3}
+                      required
+                      minLength={10}
+                      className="input-dark resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button type="submit" className="btn-gold py-1.5 px-4 text-xs">Save</button>
+                      <button type="button" onClick={() => setEditingId(null)} className="rounded-lg border border-zinc-700 px-4 py-1.5 text-xs text-zinc-400 hover:text-white transition">Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-white">{req.title}</h3>
+                        <p className="mt-1 text-sm text-zinc-500 line-clamp-3">{req.description}</p>
+                      </div>
+                      {!req.is_public && <span className="badge-zinc shrink-0">Private</span>}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {req.author_name || "Anonymous"}
+                        </span>
+                        <span className="text-xs text-zinc-600">
+                          {new Date(req.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {req.is_owner && (
+                          <>
+                            <button
+                              onClick={() => startEdit(req)}
+                              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(req.id)}
+                              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-400 transition hover:border-red-500/40 hover:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => handlePray(req.id)}
+                          title={!isAuthenticated ? "Sign in to pray" : undefined}
+                          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
+                        >
+                          🙏 {req.prayer_count ?? 0}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

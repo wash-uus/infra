@@ -16,3 +16,4 @@ dj-database-url>=2.2
 requests>=2.32
 whitenoise>=6.7
 daphne
+google-auth

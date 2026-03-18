@@ -1,6 +1,6 @@
 export const bookMeta = {
   title: "Beneath the Crown",
-  subtitle: "To the Worshipper",
+  subtitle: "A Journey Into Divine Worship",
   author: "W. Washika",
   year: 2026,
   publisher: "Inkmate Traders Limited",

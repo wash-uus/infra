@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import HeroSection from "../components/hero/HeroSection";
 import { getHomeFeed } from "../api/homeContent";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import api from "../api/client";
 
 const features = [
   { icon: "📖", title: "Content Library", description: "Dive into books, sermons, teachings, videos and daily scripture curated by revivalists across the continent.", link: "/content" },
@@ -13,11 +14,11 @@ const features = [
   { icon: "💬", title: "Live Messaging", description: "Stay connected with your community through real-time direct messages and group conversations across the network.", link: "/messages" },
 ];
 
-const stats = [
-  { value: "54", label: "African Nations Reached" },
-  { value: "7", label: "Ministry Groups" },
-  { value: "∞", label: "Lives for Christ" },
-  { value: "1", label: "Holy Spirit" },
+const FALLBACK_STATS = [
+  { key: "nations_count", label: "African Nations Reached" },
+  { key: "groups_count", label: "Ministry Groups" },
+  { key: "users_count", label: "Community Members" },
+  { key: "testimonies_count", label: "Testimonies Shared" },
 ];
 
 export default function HomePage() {
@@ -25,6 +26,7 @@ export default function HomePage() {
   const [stories, setStories] = useState([]);
   const [activeStory, setActiveStory] = useState(null);
   const [verseExpanded, setVerseExpanded] = useState(false);
+  const [platformStats, setPlatformStats] = useState(null);
   const VERSE_LIMIT = 280;
 
   useEffect(() => {
@@ -45,6 +47,12 @@ export default function HomePage() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    api.get("/common/platform-stats/")
+      .then(({ data }) => setPlatformStats(data))
+      .catch(() => { /* non-critical, fallback to null */ });
   }, []);
 
   useEffect(() => {
@@ -103,12 +111,17 @@ export default function HomePage() {
       {/* STATS */}
       <section className="mx-auto max-w-7xl px-6 pb-20">
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-800/30 md:grid-cols-4">
-          {stats.map(({ value, label }) => (
-            <div key={label} className="bg-zinc-950 px-6 py-8 text-center">
-              <p className="mb-1 bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-4xl font-black text-transparent">{value}</p>
-              <p className="text-sm text-zinc-500">{label}</p>
-            </div>
-          ))}
+          {FALLBACK_STATS.map(({ key, label }) => {
+            const value = platformStats ? platformStats[key] : null;
+            return (
+              <div key={key} className="bg-zinc-950 px-6 py-8 text-center">
+                <p className="mb-1 bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-4xl font-black text-transparent">
+                  {value !== null && value !== undefined ? value.toLocaleString() : "—"}
+                </p>
+                <p className="text-sm text-zinc-500">{label}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -353,9 +366,9 @@ export default function HomePage() {
                   <Link
                     to={`/stories/${activeStory.id}`}
                     onClick={() => setActiveStory(null)}
-                    className="rounded-lg border border-amber-500/40 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300 transition hover:border-amber-400 hover:text-amber-200"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-black transition hover:bg-amber-400"
                   >
-                    Open full page
+                    View Full Story →
                   </Link>
                 ) : null}
               </div>

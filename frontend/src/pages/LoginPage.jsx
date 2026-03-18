@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import GoogleAuthButton from "../components/auth/GoogleAuthButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,6 +19,7 @@ export default function LoginPage() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const submit = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ export default function LoginPage() {
     try {
       const response = await api.post("/accounts/login/", { email, password });
       login(response.data.access, response.data.refresh);
-      navigate("/dashboard");
+      navigate(location.state?.from?.pathname || "/dashboard", { replace: true });
     } catch {
       setError("Invalid email or password. Please try again.");
     } finally {
@@ -137,6 +139,16 @@ export default function LoginPage() {
                 <Link to="/register" className="font-semibold text-amber-400 hover:text-amber-300">
                   Create one free
                 </Link>
+              </div>
+
+              {/* Google */}
+              <div className="space-y-3">
+                <div className="relative flex items-center gap-2">
+                  <div className="flex-1 h-px bg-zinc-800" />
+                  <span className="text-xs text-zinc-600">or continue with</span>
+                  <div className="flex-1 h-px bg-zinc-800" />
+                </div>
+                <GoogleAuthButton redirectTo={location.state?.from?.pathname || "/dashboard"} />
               </div>
             </>
           ) : (

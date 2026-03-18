@@ -180,7 +180,7 @@ export default function GroupsPage() {
                     <span className="text-xs text-zinc-600">
                       {group.member_count ?? 0} member{group.member_count !== 1 ? "s" : ""}
                     </span>
-                    {isAuthenticated && (
+                    {isAuthenticated ? (
                       group.is_member ? (
                         <button
                           onClick={() => handleLeave(group.id)}
@@ -196,6 +196,13 @@ export default function GroupsPage() {
                           Join
                         </button>
                       )
+                    ) : (
+                      <Link
+                        to="/register"
+                        className="rounded-lg border border-amber-500/40 px-3 py-1 text-xs font-semibold text-amber-400 transition hover:bg-amber-950/30"
+                      >
+                        Join the community →
+                      </Link>
                     )}
                   </div>
                   <Link

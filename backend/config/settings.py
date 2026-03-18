@@ -19,7 +19,7 @@ if not DEBUG and SECRET_KEY == "insecure-dev-key":
         "FATAL: SECRET_KEY env var is not set and DEBUG is False. "
         "Set a strong SECRET_KEY before deploying."
     )
-ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 INSTALLED_APPS = [
     "daphne",                          # ASGI server — must be first for runserver to use ASGI
@@ -137,6 +137,7 @@ SITE_ID = 1
 CORS_ALLOWED_ORIGINS = [
     origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if origin.strip()
 ]
+CORS_PREFLIGHT_MAX_AGE = 86400  # cache CORS preflight responses for 24 hours
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -195,6 +196,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@spiritrevival.afr
 if DEBUG and not EMAIL_HOST:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
 SECURE_BROWSER_XSS_FILTER = True

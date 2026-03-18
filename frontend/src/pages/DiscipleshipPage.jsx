@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -82,7 +83,7 @@ export default function DiscipleshipPage() {
                   </span>
                   <div>
                     <h3 className="font-bold text-white line-clamp-1">{course.title}</h3>
-                    <p className="text-xs text-zinc-500">{course.lessons?.length ?? 0} lessons</p>
+                    <p className="text-xs text-zinc-500">{course.total_lessons ?? course.lessons?.length ?? 0} lessons</p>
                   </div>
                 </div>
 
@@ -90,38 +91,28 @@ export default function DiscipleshipPage() {
                   <p className="text-sm text-zinc-500 line-clamp-3">{course.description}</p>
                 )}
 
-                {course.lessons?.length > 0 && (
-                  <ul className="space-y-1.5 border-t border-zinc-800 pt-3">
-                    {course.lessons.slice(0, 3).map((lesson) => (
-                      <li key={lesson.id} className="flex items-center gap-2 text-xs text-zinc-500">
-                        <span className="h-1 w-1 rounded-full bg-amber-500" />
-                        {lesson.title}
-                        {lesson.video_url && (
-                          <span className="ml-auto badge-gold">Video</span>
-                        )}
-                      </li>
-                    ))}
-                    {course.lessons.length > 3 && (
-                      <li className="text-xs text-zinc-600">+{course.lessons.length - 3} more…</li>
-                    )}
-                  </ul>
+                {/* Progress bar */}
+                {isAuthenticated && (course.total_lessons ?? 0) > 0 && (
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-600 mb-1">
+                      <span>{course.completed_lessons ?? 0} / {course.total_lessons} completed</span>
+                      <span>{Math.round(((course.completed_lessons ?? 0) / course.total_lessons) * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-1.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500"
+                        style={{ width: `${Math.round(((course.completed_lessons ?? 0) / course.total_lessons) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
 
-                {isAuthenticated && (
-                  startedIds.has(course.id) ? (
-                    <p className="mt-auto text-center text-sm font-semibold text-emerald-400">
-                      ✓ In Progress
-                    </p>
-                  ) : (
-                    <button
-                      className="mt-auto btn-gold py-2 text-sm w-full justify-center disabled:opacity-60"
-                      disabled={enrollingId === course.id}
-                      onClick={() => handleStartCourse(course.id)}
-                    >
-                      {enrollingId === course.id ? "Starting…" : "Start Course"}
-                    </button>
-                  )
-                )}
+                <Link
+                  to={`/discipleship/course/${course.id}`}
+                  className="mt-auto btn-gold py-2 text-sm w-full justify-center text-center"
+                >
+                  {isAuthenticated && (course.completed_lessons ?? 0) > 0 ? "Continue Course" : "View Course"}
+                </Link>
               </div>
             ))}
           </div>

@@ -17,6 +17,9 @@ class DirectMessage(models.Model):
         ordering = ["-timestamp"]
         indexes = [models.Index(fields=["sender", "receiver", "timestamp"])]
 
+    def __str__(self):
+        return f"DM from {self.sender} to {self.receiver}"
+
 
 class GroupMessage(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_group_messages")
@@ -30,3 +33,6 @@ class GroupMessage(models.Model):
     class Meta:
         ordering = ["-timestamp"]
         indexes = [models.Index(fields=["group", "timestamp"])]
+
+    def __str__(self):
+        return f"Group msg from {self.sender} in {self.group}"

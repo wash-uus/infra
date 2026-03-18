@@ -6,7 +6,7 @@ import { bookMeta, aboutAuthor, parts, introduction } from "../data/beneathTheCr
 function openWhatsApp() {
   const phone = bookMeta.authorPhone.replace(/\s+/g, "");
   const msg = encodeURIComponent(
-    `Hello! I'd like to order a copy of "${bookMeta.title}" by ${bookMeta.author} at KSH 600 (~$4.65 USD). Please guide me on how to get it.`
+    `Hello! I'd like to order a copy of "${bookMeta.title}" by ${bookMeta.author} at KSH 1,200 (~$9.30 USD). Please guide me on how to get it.`
   );
   window.open(`https://wa.me/${phone.replace("+", "")}?text=${msg}`, "_blank");
 }
@@ -16,7 +16,7 @@ function callOwner() {
 }
 
 function emailOwner() {
-  const subject = encodeURIComponent(`Order: ${bookMeta.title} — KSH 600 (~$4.65 USD)`);
+  const subject = encodeURIComponent(`Order: ${bookMeta.title} — KSH 1,200 (~$9.30 USD)`);
   const body = encodeURIComponent(
     `Hello,\n\nI would like to order a copy of "${bookMeta.title}" by ${bookMeta.author}.\n\nPlease let me know how to proceed.\n\nThank you.`
   );
@@ -69,56 +69,130 @@ export default function BeneathTheCrownPage() {
     <div className="page-bg min-h-screen text-zinc-300">
 
       {/* ══ HERO ══════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-20 px-4 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent" />
-        <div className="pointer-events-none absolute left-1/2 top-0 h-80 w-80 -translate-x-1/2 rounded-full bg-amber-500/20 blur-3xl" />
+      <section className="relative overflow-hidden bg-black py-16 px-4">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-teal-950/20 via-transparent to-zinc-950/60" />
 
-        <div className="relative mx-auto max-w-3xl">
-          <p className="mb-4 text-7xl drop-shadow-[0_0_40px_rgba(245,158,11,0.8)]">👑</p>
+        <div className="relative mx-auto max-w-5xl">
+          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16">
 
-          <h1 className="mb-2 bg-gradient-to-br from-amber-300 via-yellow-200 to-amber-500 bg-clip-text text-5xl font-black leading-tight text-transparent sm:text-6xl md:text-7xl">
-            {bookMeta.title}
-          </h1>
-          <p className="mb-6 text-xl font-medium tracking-widest text-amber-400 uppercase">
-            {bookMeta.subtitle}
-          </p>
+            {/* ── Book Cover Mockup ── */}
+            <div className="shrink-0" style={{ filter: "drop-shadow(0 30px 60px rgba(20,184,166,0.2))" }}>
+              <div
+                className="relative w-56 sm:w-64 bg-black overflow-hidden rounded-sm"
+                style={{
+                  height: "336px",
+                  boxShadow: "8px 8px 40px rgba(0,0,0,0.9), -2px 0 12px rgba(20,184,166,0.12)",
+                }}
+              >
+                {/* Top-left teal geometric corner */}
+                <div className="absolute -top-2 -left-2 w-36 h-36 overflow-hidden">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg, #0d9488 0px, #0d9488 3px, transparent 3px, transparent 14px)",
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-black/40 to-black" />
+                </div>
 
-          <p className="mb-1 text-base text-zinc-400">
-            by <span className="font-bold text-white">{bookMeta.author}</span>
-          </p>
-          <p className="mb-8 text-xs text-zinc-500 uppercase tracking-wider">
-            {bookMeta.publisher} · {bookMeta.year}
-          </p>
+                {/* Bottom-right teal geometric corner */}
+                <div className="absolute -bottom-2 -right-2 w-36 h-36 overflow-hidden">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg, #0d9488 0px, #0d9488 3px, transparent 3px, transparent 14px)",
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-tl from-transparent via-black/40 to-black" />
+                </div>
 
-          {/* Price Badge */}
-          <div className="inline-flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-3 mb-8">
-            <div className="flex flex-col items-start">
-              <span className="text-3xl font-black text-amber-400 leading-tight">KSH 600</span>
-              <span className="text-sm font-semibold text-amber-300/70">≈ $4.65 USD</span>
+                {/* Title block */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-[58%] px-5 text-center">
+                  <p
+                    className="text-4xl sm:text-5xl font-black text-amber-50 uppercase leading-none tracking-tight"
+                    style={{ fontFamily: "Georgia, 'Times New Roman', serif", textShadow: "0 2px 24px rgba(245,158,11,0.25)" }}
+                  >
+                    BENEATH
+                  </p>
+                  <p
+                    className="text-4xl sm:text-5xl font-black text-amber-50 uppercase leading-none tracking-tight my-1"
+                    style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                  >
+                    THE
+                  </p>
+                  <p
+                    className="text-4xl sm:text-5xl font-black text-amber-50 uppercase leading-none tracking-tight"
+                    style={{ fontFamily: "Georgia, 'Times New Roman', serif", textShadow: "0 2px 24px rgba(245,158,11,0.25)" }}
+                  >
+                    CR<span role="img" aria-hidden className="text-3xl sm:text-4xl align-middle mx-px">👑</span>WN
+                  </p>
+                  <p className="mt-5 text-[9px] sm:text-[10px] font-bold text-amber-100/80 uppercase tracking-[0.15em] leading-snug">
+                    &ldquo;A JOURNEY INTO<br />DIVINE WORSHIP&rdquo;
+                  </p>
+                </div>
+
+                {/* Author */}
+                <div className="absolute bottom-5 left-0 right-0 text-center">
+                  <p className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] text-amber-100/70 uppercase">
+                    BY WASHIKA W.
+                  </p>
+                </div>
+              </div>
             </div>
-            <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-black uppercase tracking-wider">
-              Only
-            </span>
-          </div>
 
-          <p className="mx-auto mb-10 max-w-xl text-base leading-relaxed text-zinc-300">
-            A life-changing journey into the heart of true worship — from the cross to the throne
-            room of God. This is not just a book. It is an encounter.
-          </p>
+            {/* ── Info Panel ── */}
+            <div className="flex-1 text-center lg:text-left">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-teal-400">New Release · {bookMeta.year}</p>
+              <h1
+                className="mb-2 text-4xl font-black text-amber-100 sm:text-5xl uppercase tracking-tight leading-none"
+                style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+              >
+                {bookMeta.title}
+              </h1>
+              <p className="mb-6 text-sm font-semibold tracking-widest text-amber-400 uppercase">
+                &ldquo;{bookMeta.subtitle}&rdquo;
+              </p>
+              <p className="mb-1 text-sm text-zinc-400">
+                by <span className="font-bold text-white">{bookMeta.author}</span>
+              </p>
+              <p className="mb-8 text-xs text-zinc-500 uppercase tracking-wider">
+                {bookMeta.publisher} · {bookMeta.year}
+              </p>
 
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <button
-              onClick={openWhatsApp}
-              className="flex items-center gap-2 rounded-2xl bg-green-500 hover:bg-green-400 px-8 py-4 font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:scale-105 active:scale-95 text-lg"
-            >
-              <span className="text-2xl">💬</span> Order on WhatsApp
-            </button>
-            <button
-              onClick={callOwner}
-              className="flex items-center gap-2 rounded-2xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 px-8 py-4 font-bold text-amber-300 transition-all hover:scale-105 active:scale-95 text-lg"
-            >
-              <span className="text-2xl">📞</span> Call Owner
-            </button>
+              {/* Price Badge */}
+              <div className="inline-flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-3 mb-6">
+                <div className="flex flex-col items-start">
+                  <span className="text-3xl font-black text-amber-400 leading-tight">KSH 1,200</span>
+                  <span className="text-sm font-semibold text-amber-300/70">≈ $9.30 USD</span>
+                </div>
+                <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-black uppercase tracking-wider">
+                  Only
+                </span>
+              </div>
+
+              <p className="mx-auto lg:mx-0 mb-8 max-w-xl text-base leading-relaxed text-zinc-300">
+                A life-changing journey into the heart of true worship — from the cross to the throne
+                room of God. This is not just a book. It is an encounter.
+              </p>
+
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
+                <button
+                  onClick={openWhatsApp}
+                  className="flex items-center gap-2 rounded-2xl bg-green-500 hover:bg-green-400 px-8 py-4 font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:scale-105 active:scale-95 text-lg"
+                >
+                  <span className="text-2xl">💬</span> Order on WhatsApp
+                </button>
+                <button
+                  onClick={callOwner}
+                  className="flex items-center gap-2 rounded-2xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 px-8 py-4 font-bold text-amber-300 transition-all hover:scale-105 active:scale-95 text-lg"
+                >
+                  <span className="text-2xl">📞</span> Call Owner
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -232,7 +306,7 @@ export default function BeneathTheCrownPage() {
                   onClick={openWhatsApp}
                   className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-4 transition-colors"
                 >
-                  Get your copy for KSH 600 (~$4.65) →
+                  Get your copy for KSH 1,200 (~$9.30) →
                 </button>
               </p>
             </div>
@@ -357,7 +431,7 @@ export default function BeneathTheCrownPage() {
                 open a new dimension in your walk with God.
               </p>
               <p className="mb-8 text-amber-400 font-semibold text-lg">
-                Physical copy · KSH 600 only (~$4.65 USD)
+                Physical copy · KSH 1,200 only (~$9.30 USD)
               </p>
 
               <div className="flex flex-col gap-3 items-center sm:flex-row sm:justify-center">

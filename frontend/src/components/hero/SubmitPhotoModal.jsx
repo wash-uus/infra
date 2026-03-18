@@ -298,8 +298,10 @@ export default function SubmitPhotoModal({ open, onClose }) {
                       placeholder="Share what God did in this moment…"
                       value={testimony}
                       onChange={(e) => setTestimony(e.target.value)}
+                      maxLength={1000}
                       className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-amber-500 transition-colors resize-none"
                     />
+                    <p className="mt-1 text-right text-[10px] text-zinc-600">{testimony.length}/1000</p>
                   </div>
 
                   {submitting && (

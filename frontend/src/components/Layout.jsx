@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
@@ -11,10 +11,20 @@ const navLinks = [
   { to: "/book/beneath-the-crown", label: "📖 The Book" },
 ];
 
+const exploreLinks = [
+  { to: "/content", label: "Content" },
+  { to: "/groups", label: "Groups" },
+  { to: "/prayer", label: "Prayer" },
+  { to: "/hubs", label: "Hubs" },
+  { to: "/discipleship", label: "Discipleship" },
+];
+
 export default function Layout() {
   const { isAuthenticated, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
+  const exploreRef = useRef(null);
   const navigate = useNavigate();
 
   // Listen for session-expiry events fired by api/client.js so we can do a
@@ -24,6 +34,17 @@ export default function Layout() {
     window.addEventListener("auth:login-required", handle);
     return () => window.removeEventListener("auth:login-required", handle);
   }, [navigate]);
+
+  // Close explore dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (exploreRef.current && !exploreRef.current.contains(e.target)) {
+        setExploreOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <div className="min-h-screen bg-black">
@@ -62,6 +83,37 @@ export default function Layout() {
                 {label}
               </NavLink>
             ))}
+
+            {/* Explore dropdown */}
+            <div className="relative" ref={exploreRef}>
+              <button
+                onClick={() => setExploreOpen((o) => !o)}
+                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-all duration-200 hover:bg-zinc-900 hover:text-zinc-100"
+              >
+                Explore
+                <svg className={`h-3.5 w-3.5 transition-transform duration-200 ${exploreOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {exploreOpen && (
+                <div className="absolute left-0 top-full mt-1 w-40 rounded-xl border border-zinc-800 bg-zinc-950 py-1 shadow-xl shadow-black/60">
+                  {exploreLinks.map(({ to, label }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setExploreOpen(false)}
+                      className={({ isActive }) =>
+                        `block px-4 py-2.5 text-sm font-medium transition ${
+                          isActive ? "text-amber-400" : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                        }`
+                      }
+                    >
+                      {label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Auth actions */}
@@ -82,6 +134,9 @@ export default function Layout() {
                 </Link>
                 <Link to="/messages" className="hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
                   Messages
+                </Link>
+                <Link to="/profile" className="hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
+                  Profile
                 </Link>
                 <button
                   onClick={logout}
@@ -120,6 +175,22 @@ export default function Layout() {
                 {label}
               </NavLink>
             ))}
+            {/* Explore links in mobile menu */}
+            <div className="mt-1 border-t border-zinc-800/40 pt-2">
+              <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">Explore</p>
+              {exploreLinks.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={() => setMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `block rounded-lg px-4 py-2.5 text-sm font-medium ${isActive ? "text-amber-400" : "text-zinc-400 hover:text-zinc-100"}`
+                  }
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </div>
             {!isAuthenticated ? (
               <div className="mt-4 flex gap-2 border-t border-zinc-800 pt-4">
                 <Link to="/login" onClick={() => setMenuOpen(false)} className="flex-1 btn-outline py-2 text-center text-sm justify-center">

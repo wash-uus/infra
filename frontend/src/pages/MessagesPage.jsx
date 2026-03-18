@@ -123,9 +123,14 @@ function DirectTab({ isAuthenticated }) {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(null);
   const [toast, setToast] = useState(null);
+  const [showNewDm, setShowNewDm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const bottomRef = useRef(null);
   const wsRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const searchDebounce = useRef(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -139,7 +144,7 @@ function DirectTab({ isAuthenticated }) {
   useEffect(() => {
     wsRef.current?.close();
     if (!selected || !user) return;
-    const wsBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api")
+    const wsBase = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : ""))
       .replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const ws = new WebSocket(`${wsBase}/ws/messages/direct/${selected.other_user_id || selected.sender}/`);
     ws.onmessage = (e) => {
@@ -223,15 +228,99 @@ function DirectTab({ isAuthenticated }) {
     else { navigator.clipboard.writeText(t).then(() => showToast("Copied to clipboard!")); }
   };
 
+  const handleUserSearch = (q) => {
+    setSearchQuery(q);
+    clearTimeout(searchDebounce.current);
+    if (q.length < 2) { setSearchResults([]); return; }
+    searchDebounce.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await api.get("/accounts/users/search/", { params: { q } });
+        setSearchResults(r.data || []);
+      } catch { setSearchResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+  };
+
+  const startDm = (person) => {
+    setShowNewDm(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    // Optimistically create a conversation record and open the chat pane
+    const fake = {
+      id: `new-${person.id}`,
+      sender: person.id,
+      sender_email: person.email,
+      sender_name: person.full_name || person.username,
+      text: "",
+      timestamp: new Date().toISOString(),
+      other_user_id: person.id,
+    };
+    setConversations((prev) => [fake, ...prev.filter((c) => c.sender !== person.id)]);
+    openConversation(fake);
+  };
+
   return (
     <>
       {toast && <Toast msg={toast} />}
+      {/* New DM modal */}
+      {showNewDm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setShowNewDm(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-bold text-white">New Message</h3>
+              <button onClick={() => setShowNewDm(false)} className="text-zinc-500 hover:text-white transition text-lg">×</button>
+            </div>
+            <input
+              type="search" autoFocus
+              value={searchQuery}
+              onChange={(e) => handleUserSearch(e.target.value)}
+              placeholder="Search by name or username…"
+              className="input-dark w-full mb-3"
+            />
+            {searching && <p className="text-xs text-zinc-500 text-center py-3">Searching…</p>}
+            {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+              <p className="text-xs text-zinc-600 text-center py-3">No users found.</p>
+            )}
+            {searchResults.length > 0 && (
+              <ul className="space-y-1 max-h-52 overflow-y-auto">
+                {searchResults.map((person) => (
+                  <li key={person.id}>
+                    <button
+                      onClick={() => startDm(person)}
+                      className="flex items-center gap-3 w-full rounded-xl p-2.5 hover:bg-zinc-900 transition text-left"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/30 to-orange-600/20 text-sm font-bold text-amber-400 ring-1 ring-zinc-700">
+                        {(person.full_name || person.username || "?")[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{person.full_name || person.username}</p>
+                        <p className="text-xs text-zinc-500 truncate">@{person.username}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-3 min-h-[560px]">
         {/* Sidebar */}
         <div className="card overflow-hidden p-0">
           <div className="border-b border-zinc-800 px-4 py-3 flex items-center gap-2">
             <span>💬</span>
             <p className="text-sm font-semibold text-white">Direct Messages</p>
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowNewDm(true)}
+                className="ml-auto flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1 text-xs font-semibold text-amber-400 hover:bg-amber-950/30 transition"
+              >
+                + New
+              </button>
+            )}
           </div>
           {loading ? (
             <div className="space-y-2 p-4">
@@ -251,14 +340,13 @@ function DirectTab({ isAuthenticated }) {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
                                   bg-gradient-to-br from-amber-500/30 to-orange-600/20 text-sm font-bold
                                   text-amber-400 ring-1 ring-zinc-700">
-                    {(msg.sender_email || "?")[0].toUpperCase()}
+                    {(msg.sender_name || msg.sender_email || "?")[0].toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    {/* Username prefix only — not full email address */}
                     <p className="truncate text-sm font-medium text-zinc-200">
-                      {msg.sender_email?.split("@")[0] || "Member"}
+                      {msg.sender_name || msg.sender_email?.split("@")[0] || "Member"}
                     </p>
-                    <p className="truncate text-xs text-zinc-600">{msg.text || "Audio message"}</p>
+                    <p className="truncate text-xs text-zinc-600">{msg.text || "Start a conversation"}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {!msg.is_read && <span className="h-2 w-2 rounded-full bg-amber-400" />}
@@ -350,7 +438,7 @@ function GroupsTab({ isAuthenticated }) {
       .then((r) => setThread(r.data.results || []))
       .catch(() => setThread([]));
 
-    const wsBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api")
+    const wsBase = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : ""))
       .replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const ws = new WebSocket(`${wsBase}/ws/messages/group/${selected.id}/`);
     ws.onopen = () => setWsStatus("connected");

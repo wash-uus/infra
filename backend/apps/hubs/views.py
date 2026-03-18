@@ -43,4 +43,10 @@ class RevivalHubViewSet(viewsets.ModelViewSet):
     def join(self, request, pk=None):
         hub = self.get_object()
         HubMembership.objects.get_or_create(user=request.user, hub=hub)
-        return Response({"detail": "Joined hub"})
+        return Response({"detail": "Joined hub", "is_member": True})
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def leave(self, request, pk=None):
+        hub = self.get_object()
+        HubMembership.objects.filter(user=request.user, hub=hub).delete()
+        return Response({"detail": "Left hub", "is_member": False})
