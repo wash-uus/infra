@@ -6,7 +6,7 @@ export const bookMeta = {
   publisher: "Inkmate Traders Limited",
   publisherContact: "+254 740 048 984",
   publisherEmail: "Inkmatetraderslimited@gmail.com",
-  authorEmail: "Spiritrevivalafrica@gmail.com",
+  authorEmail: "spirit@spiritrevivalafrica.com",
   authorPhone: "+254 0140365237",
   copyright: "© W. Washika, 2026. All rights reserved.",
   dedication:
