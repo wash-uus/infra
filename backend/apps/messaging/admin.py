@@ -47,8 +47,6 @@ class GroupMessageReadReceiptAdmin(admin.ModelAdmin):
     list_filter = ("group",)
     raw_id_fields = ("user", "group")
     ordering = ("-last_read_at",)
-    raw_id_fields = ("sender", "group")
-    ordering = ("-timestamp",)
     list_per_page = 50
 
     @admin.display(description="Message")
