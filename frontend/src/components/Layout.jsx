@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import messaging from "../api/messaging";
 import SignupModal from "./signup/SignupModal";
 
 const navLinks = [
@@ -24,8 +25,19 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
+  const [msgUnread, setMsgUnread] = useState(0);
   const exploreRef = useRef(null);
   const navigate = useNavigate();
+
+  // Poll unread message count for nav badge
+  useEffect(() => {
+    if (!isAuthenticated) { setMsgUnread(0); return; }
+    const fetchCount = () =>
+      messaging.getUnreadCount().then((r) => setMsgUnread(r.data?.total ?? 0)).catch(() => {});
+    fetchCount();
+    const id = setInterval(fetchCount, 30_000);
+    return () => clearInterval(id);
+  }, [isAuthenticated]);
 
   // Listen for session-expiry events fired by api/client.js so we can do a
   // smooth React Router redirect instead of a full page reload.
@@ -132,8 +144,13 @@ export default function Layout() {
                 <Link to="/dashboard" className="hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
                   Dashboard
                 </Link>
-                <Link to="/messages" className="hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
+                <Link to="/messages" className="relative hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
                   Messages
+                  {msgUnread > 0 && (
+                    <span className="absolute -right-1 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-black">
+                      {msgUnread > 9 ? "9+" : msgUnread}
+                    </span>
+                  )}
                 </Link>
                 <Link to="/profile" className="hidden rounded-lg px-4 py-2 text-sm font-medium text-zinc-300 transition hover:text-white sm:block">
                   Profile
@@ -205,8 +222,13 @@ export default function Layout() {
                 <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="block rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition">
                   Dashboard
                 </Link>
-                <Link to="/messages" onClick={() => setMenuOpen(false)} className="block rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition">
+                <Link to="/messages" onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition">
                   Messages
+                  {msgUnread > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
+                      {msgUnread > 9 ? "9+" : msgUnread}
+                    </span>
+                  )}
                 </Link>
                 <Link to="/profile" onClick={() => setMenuOpen(false)} className="block rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition">
                   Profile

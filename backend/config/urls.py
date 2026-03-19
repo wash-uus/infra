@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -24,4 +26,8 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+elif os.getenv("MEDIA_STORAGE", "local") == "local":
+    # Serve uploaded media via Django on Truehost (local filesystem storage).
+    # For high-traffic deployments switch MEDIA_STORAGE to cloudinary or s3.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

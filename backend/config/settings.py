@@ -5,9 +5,11 @@ from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Explicitly load .env from the project root (backend/) so it works
+# regardless of the working directory Passenger sets at startup.
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "insecure-dev-key")
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -22,7 +24,6 @@ if not DEBUG and SECRET_KEY == "insecure-dev-key":
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 INSTALLED_APPS = [
-    "daphne",                          # ASGI server — must be first for runserver to use ASGI
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -35,7 +36,6 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "corsheaders",
-    "channels",
     "storages",
     "apps.common",
     "apps.accounts",
@@ -79,7 +79,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
+# ASGI_APPLICATION intentionally omitted — project runs on WSGI (Truehost cPanel / Passenger).
+# To re-enable WebSockets in the future, add daphne + channels back to INSTALLED_APPS,
+# restore config/routing.py consumers, and set: ASGI_APPLICATION = "config.asgi.application"
 
 _db_url = os.getenv("DATABASE_URL", "")
 if _db_url:
@@ -168,20 +170,14 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 }
 
-REDIS_URL = os.getenv("REDIS_URL", "")
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [REDIS_URL]},
-        }
-    }
-else:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
-        }
-    }
+# CHANNEL_LAYERS intentionally removed — WebSocket/Channels not used on WSGI hosting.
+# To re-enable: install channels + channels-redis, set ASGI_APPLICATION, and restore:
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {"hosts": [REDIS_URL]},
+#     }
+# }
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
@@ -189,7 +185,7 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@spiritrevival.africa")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@spiritrevivalafrica.com")
 
 # In development, fall back to console backend when no SMTP host is configured
 # so password-reset and verification flows can be tested without a real mail server
