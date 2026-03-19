@@ -57,3 +57,5 @@ desktop.ini
 coverage/
 htmlcov/
 .coverage
+
+*.zip
