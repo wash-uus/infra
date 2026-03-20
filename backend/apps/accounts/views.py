@@ -52,13 +52,16 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         token = signing.dumps({"user_id": user.id})
         verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-        send_mail(
-            subject="Verify your Spirit Revival Africa account",
-            message=f"Welcome!\nVerify your email: {verify_url}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=True,
-        )
+        try:
+            send_mail(
+                subject="Verify your Spirit Revival Africa account",
+                message=f"Welcome!\nVerify your email: {verify_url}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Verification email failed for user_id=%s", user.id)
 
 
 class EmailLoginView(TokenObtainPairView):
@@ -107,17 +110,22 @@ class PasswordResetRequestView(APIView):
             if user:
                 token = signing.dumps({"user_id": user.id, "purpose": "password_reset"})
                 reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-                send_mail(
-                    subject="Reset your Spirit Revival Africa password",
-                    message=(
-                        f"Hi {user.username},\n\n"
-                        f"Click the link below to reset your password (valid for 1 hour):\n{reset_url}\n\n"
-                        "If you didn't request this, you can safely ignore this email."
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=True,
-                )
+                try:
+                    send_mail(
+                        subject="Reset your Spirit Revival Africa password",
+                        message=(
+                            f"Hi {user.username},\n\n"
+                            f"Click the link below to reset your password (valid for 1 hour):\n{reset_url}\n\n"
+                            "If you didn't request this, you can safely ignore this email."
+                        ),
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                    )
+                except Exception:
+                    logger.exception("Password reset email failed for user_id=%s", user.id)
+            else:
+                logger.warning("Password reset requested for unknown/inactive email: %s", email)
         return Response({"detail": "If that email is registered you will receive a reset link shortly."})
 
 
