@@ -29,8 +29,10 @@ export default function LoginPage() {
       const response = await api.post("/accounts/login/", { email, password });
       login(response.data.access, response.data.refresh);
       navigate(location.state?.from?.pathname || "/dashboard", { replace: true });
-    } catch {
-      setError("Invalid email or password. Please try again.");
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+        || err?.response?.data?.non_field_errors?.[0];
+      setError(detail || "Invalid email or password. Please try again.");
     } finally {
       setLoading(false);
     }
