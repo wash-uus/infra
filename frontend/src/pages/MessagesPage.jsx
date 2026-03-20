@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import api from "../api/client";
 import messaging from "../api/messaging";
 import { useAuth } from "../context/AuthContext";
 import useMessagePolling from "../hooks/useMessagePolling";
@@ -268,7 +269,6 @@ function DirectTab({ isAuthenticated }) {
     searchDebounce.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const { default: api } = await import("../api/client");
         const r = await api.get("/accounts/users/search/", { params: { q } });
         setSearchResults(r.data || []);
       } catch { setSearchResults([]); }
@@ -484,12 +484,10 @@ function GroupsTab({ isAuthenticated }) {
 
   // Load groups
   useEffect(() => {
-    import("../api/client").then(({ default: api }) => {
-      api.get("/groups/")
-        .then((r) => setGroups(r.data.results || []))
-        .catch(() => setGroups([]))
-        .finally(() => setLoading(false));
-    });
+    api.get("/groups/")
+      .then((r) => setGroups(r.data.results || []))
+      .catch(() => setGroups([]))
+      .finally(() => setLoading(false));
   }, []);
 
   // Load initial thread when a group is selected
