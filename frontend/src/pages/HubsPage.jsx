@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 const statusInfo = {
   approved: { label: "Approved", cls: "badge-green" },
@@ -20,6 +21,11 @@ function Toast({ msg, err }) {
 }
 
 export default function HubsPage() {
+  usePageMeta({
+    title: "Revival Hubs",
+    description:
+      "Physical and digital revival centres forming across Africa. Find a hub near you or pioneer one in your city.",
+  });
   const [hubs, setHubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

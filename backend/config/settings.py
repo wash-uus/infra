@@ -159,7 +159,13 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "300/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "300/min",
+        # Tighter per-IP limit for authentication endpoints
+        "login": "10/min",
+        "password_reset": "5/hour",
+    },
 }
 
 SIMPLE_JWT = {
@@ -195,9 +201,24 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
+# Africa's Talking — SMS welcome & approval notifications
+# Free sandbox at https://account.africastalking.com/ (use username='sandbox' for testing)
+AT_USERNAME  = os.getenv("AT_USERNAME", "")    # 'sandbox' during testing, your real username in production
+AT_API_KEY   = os.getenv("AT_API_KEY",  "")    # from your AT dashboard
+AT_SENDER_ID = os.getenv("AT_SENDER_ID", "")   # optional alphanumeric sender e.g. 'SRA' (max 11 chars)
+
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+# Referrer Policy — prevent leaking full URLs to third-party origins
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+# Permissions Policy — disable features the app doesn't use
+PERMISSIONS_POLICY = {
+    "camera": [],
+    "microphone": [],
+    "geolocation": [],
+    "interest-cohort": [],
+}
 
 if not DEBUG:
     # cPanel / Truehost terminate SSL at the proxy — forwarding X-Forwarded-Proto.

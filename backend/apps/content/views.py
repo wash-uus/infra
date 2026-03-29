@@ -1,5 +1,7 @@
 import random
 
+from django.conf import settings as django_settings
+from django.core.mail import send_mail
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, viewsets
@@ -8,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsModeratorOrAbove
+from apps.common.utils import log_action, send_notification
 from apps.content.models import ContentItem, DailyBread, FetchedPhoto, GalleryItem, ShortStory, UserPhoto
 from apps.content.serializers import (
     ContentItemSerializer,
@@ -18,6 +21,44 @@ from apps.content.serializers import (
     ShortStorySerializer,
     UserPhotoSerializer,
 )
+
+
+def _send_content_notification(item, approved: bool, reason: str = "") -> None:
+    """Notify the content author of approval/rejection via in-app + email."""
+    user = item.author
+    if approved:
+        notif_title = "Your content is live ✓"
+        notif_msg = f'"{item.title}" has been approved and is now visible in the content library.'
+        notif_type = "approved"
+        subject = "Your content is live — Spirit Revival Africa"
+        body = (
+            f"Hi {user.first_name or 'there'},\n\n"
+            f'Your submission "{item.title}" has been approved and is now live.\n\n'
+            f"View it here: {django_settings.FRONTEND_URL}/content\n\n"
+            f"— Spirit Revival Africa"
+        )
+    else:
+        notif_title = "Update on your content submission"
+        notif_msg = (
+            f'"{item.title}" was not approved.'
+            + (f" Reason: {reason}" if reason else "")
+        )
+        notif_type = "rejected"
+        subject = "Update on your content submission — Spirit Revival Africa"
+        body = (
+            f"Hi {user.first_name or 'there'},\n\n"
+            f'Your submission "{item.title}" could not be approved at this time.\n'
+            + (f"Reason: {reason}\n\n" if reason else "\n")
+            + "You're welcome to revise and resubmit.\n\n— Spirit Revival Africa"
+        )
+
+    send_notification(user, notif_title, notif_msg, notif_type=notif_type, link="/content")
+    if user.email:
+        try:
+            send_mail(subject, body, django_settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+        except Exception:
+            pass
+
 
 
 class ContentItemViewSet(viewsets.ModelViewSet):
@@ -42,21 +83,50 @@ class ContentItemViewSet(viewsets.ModelViewSet):
         return qs.filter(approved=True)
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        serializer.save(author=self.request.user, approved=False)
 
     @action(detail=True, methods=["post"], permission_classes=[IsModeratorOrAbove])
     def approve(self, request, pk=None):
         item = self.get_object()
         item.approved = True
         item.save(update_fields=["approved"])
+        log_action(request.user, "content.approve", "ContentItem", item.pk, detail=item.title)
+        _send_content_notification(item, approved=True)
         return Response({"detail": "Content approved"})
 
     @action(detail=True, methods=["post"], permission_classes=[IsModeratorOrAbove])
     def reject(self, request, pk=None):
         item = self.get_object()
+        reason = request.data.get("reason", "")
         item.approved = False
         item.save(update_fields=["approved"])
+        log_action(request.user, "content.reject", "ContentItem", item.pk,
+                   detail=f"{item.title} | reason: {reason}")
+        _send_content_notification(item, approved=False, reason=reason)
         return Response({"detail": "Content rejected"})
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def share(self, request, pk=None):
+        """Return share card data for a ContentItem."""
+        item = self.get_object()
+        if not item.approved:
+            return Response({"detail": "Not shareable."}, status=404)
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://spiritrevivalafrica.com")
+        photo_url = None
+        if item.photo:
+            photo_url = request.build_absolute_uri(item.photo.url) if request else None
+        excerpt = (item.description[:200].rstrip() + "…") if len(item.description) > 200 else item.description
+        return Response({
+            "title": item.title,
+            "excerpt": excerpt,
+            "url": f"{frontend_url}/content",
+            "photo_url": photo_url,
+            "cta": f"Read more → {frontend_url}/content",
+            "whatsapp_caption": (
+                f"📖 *{item.title}*\n\n{excerpt}\n\n"
+                f"Read the full article: {frontend_url}/content"
+            ),
+        })
 
 
 class UserPhotoViewSet(viewsets.ModelViewSet):
@@ -282,7 +352,9 @@ class ShortStoryPublicListView(APIView):
     def get(self, request):
         limit = min(int(request.query_params.get("limit", 3)), 10)
         now = timezone.now()
-        items = ShortStory.objects.filter(is_published=True, published_at__lte=now)[:limit]
+        items = ShortStory.objects.filter(
+            is_published=True, published_at__lte=now, status=ShortStory.Status.APPROVED
+        )[:limit]
         return Response({"results": ShortStorySerializer(items, many=True, context={"request": request}).data, "count": len(items)})
 
 
@@ -292,13 +364,171 @@ class ShortStoryPublicDetailView(APIView):
     def get(self, request, story_id):
         now = timezone.now()
         story = (
-            ShortStory.objects.filter(id=story_id, is_published=True, published_at__lte=now)
+            ShortStory.objects.filter(
+                id=story_id, is_published=True, published_at__lte=now, status=ShortStory.Status.APPROVED
+            )
             .order_by("-published_at")
             .first()
         )
         if not story:
             return Response({"detail": "Story not found"}, status=404)
         return Response({"story": ShortStorySerializer(story, context={"request": request}).data})
+
+
+class ShortStorySubmitView(APIView):
+    """
+    POST /api/content/stories/submit/
+    Authenticated users submit a testimony/story for admin review.
+    It goes into PENDING status; admin approves before it goes live.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        title = request.data.get("title", "").strip()
+        story = request.data.get("story", "").strip()
+        author_name = (
+            request.data.get("submitter_name", "").strip()
+            or request.data.get("author_name", "").strip()
+            or request.user.full_name
+        )
+        photo = request.FILES.get("photo")
+        if not title or len(title) < 5:
+            return Response({"detail": "Title must be at least 5 characters."}, status=400)
+        if not story or len(story) < 50:
+            return Response({"detail": "Story must be at least 50 characters."}, status=400)
+
+        obj = ShortStory.objects.create(
+            title=title,
+            story=story,
+            author_name=author_name,
+            submitter=request.user,
+            photo=photo,
+            status=ShortStory.Status.PENDING,
+            is_published=False,
+        )
+        log_action(request.user, "story.submit", "ShortStory", obj.pk, detail=title)
+        return Response({"detail": "Story submitted for review.", "id": obj.pk}, status=201)
+
+    def get(self, request):
+        """Users can list their own submitted stories and see approval status."""
+        stories = ShortStory.objects.filter(submitter=request.user).order_by("-created_at")
+        data = [
+            {
+                "id": s.pk,
+                "title": s.title,
+                "status": s.status,
+                "rejection_reason": s.rejection_reason,
+                "created_at": s.created_at,
+            }
+            for s in stories
+        ]
+        return Response({"results": data})
+
+
+class ShortStoryApproveView(APIView):
+    """
+    POST /api/content/stories/<id>/approve/
+    POST /api/content/stories/<id>/reject/
+    Moderator/admin actions — fire notification + log.
+    """
+    permission_classes = [IsModeratorOrAbove]
+
+    def _get_story(self, story_id):
+        try:
+            return ShortStory.objects.get(pk=story_id)
+        except ShortStory.DoesNotExist:
+            return None
+
+    def _notify_story(self, story, approved: bool, reason: str = "") -> None:
+        user = story.submitter
+        if not user:
+            return
+        if approved:
+            notif_title = "Your story is live ✓"
+            notif_msg = f'"{story.title}" has been approved and is now visible on the platform.'
+            notif_type = "approved"
+            subject = "Your story is live — Spirit Revival Africa"
+            body = (
+                f"Hi {user.first_name or 'there'},\n\n"
+                f'Your testimony "{story.title}" has been approved and is now live.\n\n'
+                f"Thank you for sharing what God has done. Your story will encourage others.\n\n"
+                f"— Spirit Revival Africa"
+            )
+        else:
+            notif_title = "Update on your story submission"
+            notif_msg = (
+                f'"{story.title}" was not approved.'
+                + (f" Reason: {reason}" if reason else "")
+            )
+            notif_type = "rejected"
+            subject = "Update on your story submission — Spirit Revival Africa"
+            body = (
+                f"Hi {user.first_name or 'there'},\n\n"
+                f'Your story "{story.title}" could not be approved at this time.\n'
+                + (f"Reason: {reason}\n\n" if reason else "\n")
+                + "You're welcome to revise and resubmit.\n\n— Spirit Revival Africa"
+            )
+        send_notification(user, notif_title, notif_msg, notif_type=notif_type)
+        if user.email:
+            try:
+                send_mail(subject, body, django_settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+            except Exception:
+                pass
+
+    def post(self, request, story_id, action_type):
+        story = self._get_story(story_id)
+        if not story:
+            return Response({"detail": "Story not found."}, status=404)
+
+        if action_type == "approve":
+            story.status = ShortStory.Status.APPROVED
+            story.rejection_reason = ""
+            story.is_published = True
+            story.reviewed_by = request.user
+            story.reviewed_at = timezone.now()
+            story.save(update_fields=["status", "rejection_reason", "is_published", "reviewed_by", "reviewed_at"])
+            log_action(request.user, "story.approve", "ShortStory", story.pk, detail=story.title)
+            self._notify_story(story, approved=True)
+            return Response({"detail": "Story approved and is now live."})
+        elif action_type == "reject":
+            reason = request.data.get("reason", "")
+            story.status = ShortStory.Status.REJECTED
+            story.rejection_reason = reason
+            story.is_published = False
+            story.reviewed_by = request.user
+            story.reviewed_at = timezone.now()
+            story.save(update_fields=["status", "rejection_reason", "is_published", "reviewed_by", "reviewed_at"])
+            log_action(request.user, "story.reject", "ShortStory", story.pk, detail=f"{story.title} | {reason}")
+            self._notify_story(story, approved=False, reason=reason)
+            return Response({"detail": "Story rejected. User notified."})
+        return Response({"detail": "Invalid action."}, status=400)
+
+
+class StoryShareView(APIView):
+    """GET /api/content/stories/<id>/share/ — public share card data."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, story_id):
+        try:
+            story = ShortStory.objects.get(pk=story_id, status=ShortStory.Status.APPROVED, is_published=True)
+        except ShortStory.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://spiritrevivalafrica.com")
+        excerpt = (story.story[:200].rstrip() + "…") if len(story.story) > 200 else story.story
+        photo_url = None
+        if story.photo:
+            photo_url = request.build_absolute_uri(story.photo.url)
+        return Response({
+            "title": story.title,
+            "excerpt": excerpt,
+            "url": f"{frontend_url}/prayer",
+            "photo_url": photo_url,
+            "whatsapp_caption": (
+                f"✨ *{story.title}*\n\n{excerpt}\n\n"
+                f"Read more at Spirit Revival Africa: {frontend_url}"
+            ),
+        })
+
 
 
 class GalleryPublicListView(APIView):
@@ -326,7 +556,9 @@ class HomeFeedView(APIView):
             .order_by("-display_date", "-updated_at")
             .first()
         )
-        stories = ShortStory.objects.filter(is_published=True, published_at__lte=now)[:stories_limit]
+        stories = ShortStory.objects.filter(
+            is_published=True, published_at__lte=now, status=ShortStory.Status.APPROVED
+        )[:stories_limit]
 
         return Response(
             {

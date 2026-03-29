@@ -30,3 +30,28 @@ class GroupMembership(models.Model):
     class Meta:
         unique_together = ("user", "group")
         indexes = [models.Index(fields=["user", "group"])]
+
+
+class GroupJoinRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="group_join_requests")
+    group = models.ForeignKey(RevivalGroup, on_delete=models.CASCADE, related_name="join_requests")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    note = models.TextField(blank=True)  # optional note from requester
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="reviewed_join_requests"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("user", "group")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} → {self.group} ({self.status})"

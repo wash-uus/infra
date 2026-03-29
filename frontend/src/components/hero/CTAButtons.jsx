@@ -7,10 +7,10 @@ export default function CTAButtons() {
         Join the Movement
       </Link>
       <Link
-        to="/content"
+        to="/book/beneath-the-crown"
         className="rounded-xl border border-amber-500/40 bg-black/40 px-8 py-3 text-sm font-semibold text-amber-300 transition hover:shadow-[0_0_18px_rgba(212,175,55,0.2)] sm:text-base"
       >
-        Watch Revival
+        Read the Book
       </Link>
     </div>
   );

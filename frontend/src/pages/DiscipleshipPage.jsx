@@ -3,8 +3,14 @@ import { Link } from "react-router-dom";
 
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 export default function DiscipleshipPage() {
+  usePageMeta({
+    title: "Discipleship Courses",
+    description:
+      "Structured courses for every believer — from new faith to revival leadership. Grow deeper in Christ with Spirit Revival Africa's discipleship system.",
+  });
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

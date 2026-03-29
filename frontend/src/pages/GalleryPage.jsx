@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getGallery, getGalleryPage } from "../api/gallery";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 const TABS = [
   { label: "All", value: null },
@@ -61,6 +62,11 @@ function VideoEmbed({ item }) {
 }
 
 export default function GalleryPage() {
+  usePageMeta({
+    title: "Gallery",
+    description:
+      "Photos and videos capturing moments of faith, community and worship from Spirit Revival Africa.",
+  });
   const [activeTab, setActiveTab] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

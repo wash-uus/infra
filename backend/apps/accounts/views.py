@@ -13,7 +13,7 @@ from django.db.models import Count
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -40,6 +40,66 @@ from apps.prayer.models import PrayerRequest
 User = get_user_model()
 
 
+def _send_sms(to_phone: str, message: str, log_label: str = "SMS") -> None:
+    """
+    Send an SMS via Africa's Talking REST API.
+    Uses only the `requests` library (already in requirements).
+    Silently skips if AT_API_KEY / AT_USERNAME are not configured.
+    """
+    import requests as _requests
+
+    api_key  = settings.AT_API_KEY
+    username = settings.AT_USERNAME
+    if not api_key or not username:
+        logger.debug("%s skipped — Africa's Talking not configured", log_label)
+        return
+
+    # Normalise to E.164
+    phone = to_phone.strip()
+    if not phone.startswith("+"):
+        phone = f"+{phone}"
+
+    payload = {
+        "username": username,
+        "to":       phone,
+        "message":  message,
+    }
+    sender_id = (settings.AT_SENDER_ID or "").strip()
+    if sender_id:
+        payload["from"] = sender_id
+
+    env = "sandbox" if username == "sandbox" else "production"
+    url = (
+        "https://api.sandbox.africastalking.com/version1/messaging"
+        if env == "sandbox"
+        else "https://api.africastalking.com/version1/messaging"
+    )
+    try:
+        resp = _requests.post(
+            url,
+            headers={"apiKey": api_key, "Accept": "application/json"},
+            data=payload,
+            timeout=10,
+        )
+        if resp.status_code != 201:
+            logger.warning("%s: AT returned %s — %s", log_label, resp.status_code, resp.text[:200])
+    except Exception:
+        logger.exception("%s: request to Africa's Talking failed", log_label)
+
+
+def _send_welcome_notifications(user) -> None:
+    """Send a welcome SMS to a newly registered user (if phone is set)."""
+    phone = (user.phone or "").strip()
+    if not phone:
+        return
+    message = (
+        f"Welcome to Spirit Revival Africa, {user.full_name or user.username}! "
+        "Account created. Please verify your email then await admin approval. "
+        "God bless you — SRA Team"
+    )
+    _send_sms(phone, message, log_label=f"WelcomeSMS user_id={user.id}")
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Auth
 # ════════════════════════════════════════════════════════════════════════════
@@ -50,12 +110,20 @@ class RegisterView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = serializer.save()
+
+        # ── Email verification ──────────────────────────────────────────────
         token = signing.dumps({"user_id": user.id})
         verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
         try:
             send_mail(
                 subject="Verify your Spirit Revival Africa account",
-                message=f"Welcome!\nVerify your email: {verify_url}",
+                message=(
+                    f"Hi {user.full_name or user.username},\n\n"
+                    f"Welcome to Spirit Revival Africa!\n\n"
+                    f"Please verify your email address by clicking the link below:\n{verify_url}\n\n"
+                    "If you didn't create this account, please ignore this email.\n\n"
+                    "God bless you,\nThe SRA Team"
+                ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
                 fail_silently=False,
@@ -63,9 +131,18 @@ class RegisterView(generics.CreateAPIView):
         except Exception:
             logger.exception("Verification email failed for user_id=%s", user.id)
 
+        # ── Welcome SMS ─────────────────────────────────────────────────────
+        _send_welcome_notifications(user)
+
+
+class LoginThrottle(ScopedRateThrottle):
+    """10 login attempts per minute per IP — prevents credential stuffing."""
+    scope = "login"
+
 
 class EmailLoginView(TokenObtainPairView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginThrottle]
     serializer_class = EmailTokenObtainPairSerializer
 
 
@@ -453,6 +530,142 @@ def site_statistics(request):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Account Approval  (Admin+)
+# ════════════════════════════════════════════════════════════════════════════
+
+class PendingApprovalsView(generics.ListAPIView):
+    """GET — list users who verified email but are awaiting admin approval."""
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminOrAbove]
+
+    def get_queryset(self):
+        return User.objects.filter(is_approved=False, email_verified=True, is_active=True).order_by("date_joined")
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminOrAbove])
+def approve_user(request, user_id):
+    user = User.objects.filter(id=user_id).first()
+    if not user:
+        return Response({"detail": "User not found"}, status=404)
+    user.is_approved = True
+    user.save(update_fields=["is_approved"])
+    log_action(actor=request.user, action="approve_user",
+               target_model="user", target_id=user_id, ip=get_client_ip(request))
+    send_notification(user, "Account Approved",
+                      "Your Spirit Revival Africa account has been approved. Welcome to the movement!",
+                      notif_type="info")
+    try:
+        send_mail(
+            subject="Your Spirit Revival Africa account is approved!",
+            message=(
+                f"Hi {user.full_name or user.username},\n\n"
+                "Great news — your account has been approved by our team.\n"
+                "You can now sign in and join the revival movement!\n\n"
+                f"Sign in here: {settings.FRONTEND_URL}/login\n\n"
+                "God bless you,\nThe SRA Team"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Approval email failed for user_id=%s", user_id)
+
+    # Send approval SMS
+    phone = (user.phone or "").strip()
+    if phone:
+        approval_text = (
+            f"{user.full_name or user.username}, your Spirit Revival Africa account is now APPROVED! "
+            f"Sign in: {settings.FRONTEND_URL}/login — SRA Team"
+        )
+        _send_sms(phone, approval_text, log_label=f"ApprovalSMS user_id={user_id}")
+
+    return Response({"detail": "User approved"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminOrAbove])
+def reject_user(request, user_id):
+    user = User.objects.filter(id=user_id).first()
+    if not user:
+        return Response({"detail": "User not found"}, status=404)
+    reason = request.data.get("reason", "Your account did not meet our membership requirements.")
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    log_action(actor=request.user, action="reject_user",
+               target_model="user", target_id=user_id,
+               detail=reason, ip=get_client_ip(request))
+    try:
+        send_mail(
+            subject="Spirit Revival Africa — Account Registration Update",
+            message=(
+                f"Hi {user.full_name or user.username},\n\n"
+                f"Unfortunately we were unable to approve your account at this time.\n"
+                f"Reason: {reason}\n\n"
+                "If you believe this is a mistake, please contact us.\n\n"
+                "God bless you,\nThe SRA Team"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Rejection email failed for user_id=%s", user_id)
+    return Response({"detail": "User rejected and deactivated"})
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Admin Messaging  (Admin+)
+# ════════════════════════════════════════════════════════════════════════════
+
+@api_view(["POST"])
+@permission_classes([IsAdminOrAbove])
+def admin_send_message(request, user_id):
+    """POST — admin sends a direct message to a specific user."""
+    from apps.messaging.models import DirectMessage
+    target = User.objects.filter(id=user_id, is_active=True).first()
+    if not target:
+        return Response({"detail": "User not found"}, status=404)
+    text = request.data.get("text", "").strip()
+    if not text:
+        return Response({"detail": "Message text is required."}, status=400)
+    if len(text) > 4000:
+        return Response({"detail": "Message exceeds 4000 characters."}, status=400)
+    msg = DirectMessage.objects.create(sender=request.user, receiver=target, text=text)
+    log_action(actor=request.user, action="admin_message_user",
+               target_model="user", target_id=user_id,
+               detail=f"Sent DM: {text[:80]}", ip=get_client_ip(request))
+    send_notification(target, "New message from SRA Admin", text[:100], notif_type="info")
+    return Response({"detail": "Message sent", "message_id": msg.id})
+
+
+@api_view(["POST"])
+@permission_classes([IsAdminOrAbove])
+def admin_broadcast_message(request):
+    """POST — admin sends a direct message to ALL active users at once."""
+    from apps.messaging.models import DirectMessage
+    text = request.data.get("text", "").strip()
+    if not text:
+        return Response({"detail": "Message text is required."}, status=400)
+    if len(text) > 4000:
+        return Response({"detail": "Message exceeds 4000 characters."}, status=400)
+
+    sender = request.user
+    recipients = User.objects.filter(is_active=True, is_approved=True).exclude(id=sender.id)
+    batch = [
+        DirectMessage(sender=sender, receiver=recipient, text=text)
+        for recipient in recipients
+    ]
+    DirectMessage.objects.bulk_create(batch, batch_size=500, ignore_conflicts=False)
+    count = len(batch)
+    log_action(actor=request.user, action="admin_broadcast",
+               target_model="user", target_id=None,
+               detail=f"Broadcast to {count} users: {text[:80]}", ip=get_client_ip(request))
+    return Response({"detail": f"Broadcast sent to {count} users."})
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # Change Password  (authenticated users)
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -530,60 +743,62 @@ class UserSearchView(generics.ListAPIView):
 
 class GoogleAuthView(APIView):
     """
-    POST { credential, email, name, given_name, family_name, email_verified, sub }
-    Accepts a Google OAuth2 access token, verifies user info, finds or creates
-    the SRA user, and returns access + refresh JWT tokens.
+    POST { credential }  — credential is a Google ID token (JWT) issued by
+    Google One Tap or the @react-oauth/google Sign-In button.
+
+    Security model:
+    - We verify the ID token cryptographically using google-auth library.
+    - google-auth fetches Google's public JWK set, verifies the RS256
+      signature, validates `aud` == GOOGLE_CLIENT_ID, and checks `exp`.
+    - This prevents token substitution (tokens from other OAuth clients are
+      rejected) and replay attacks (expired tokens are rejected locally).
+    - We do NOT call Google's tokeninfo endpoint — that would mean trusting
+      an opaque access_token whose `aud` could belong to any Google app.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginThrottle]
 
     def post(self, request):
-        import requests as http_requests
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
         from rest_framework_simplejwt.tokens import RefreshToken
+        import random, string as _string
 
         client_id = settings.GOOGLE_CLIENT_ID
         if not client_id:
             return Response({"detail": "Google login is not configured on this server."}, status=503)
 
-        # The frontend sends either an access_token (OAuth2 flow) or credential (ID token flow).
-        # We support the access_token path: verify by calling Google's tokeninfo endpoint.
-        access_token = request.data.get("credential", "").strip()
-        if not access_token:
+        credential = request.data.get("credential", "").strip()
+        if not credential:
             return Response({"detail": "No credential provided."}, status=400)
 
-        # Verify the token with Google's tokeninfo API
+        # Cryptographically verify the Google ID token.
+        # This raises ValueError for any verification failure.
         try:
-            resp = http_requests.get(
-                "https://www.googleapis.com/oauth2/v3/tokeninfo",
-                params={"access_token": access_token},
-                timeout=10,
+            id_info = google_id_token.verify_oauth2_token(
+                credential,
+                google_requests.Request(),
+                client_id,
             )
-        except Exception:
-            return Response({"detail": "Could not reach Google servers."}, status=503)
-
-        if resp.status_code != 200:
+        except ValueError as exc:
+            logger.warning("Google ID token verification failed: %s", exc)
             return Response({"detail": "Invalid or expired Google token."}, status=400)
+        except Exception:
+            logger.exception("Unexpected error verifying Google ID token")
+            return Response({"detail": "Could not verify Google token."}, status=503)
 
-        token_info = resp.json()
+        # id_info is now a verified dict with claims: sub, email, email_verified, name, ...
+        if not id_info.get("email_verified"):
+            return Response({"detail": "Google email is not verified."}, status=400)
 
-        # Verify the token was issued for our client
-        if token_info.get("aud") != client_id and token_info.get("azp") != client_id:
-            return Response({"detail": "Google token audience mismatch."}, status=400)
-
-        email = (token_info.get("email") or request.data.get("email", "")).lower().strip()
+        email = id_info.get("email", "").lower().strip()
         if not email:
             return Response({"detail": "Google account has no email address."}, status=400)
 
-        email_verified = token_info.get("email_verified") == "true" or request.data.get("email_verified", False)
-        if not email_verified:
-            return Response({"detail": "Google email is not verified."}, status=400)
-
-        # Find or create user
+        # Find or create the SRA user
         user = User.objects.filter(email=email).first()
         if user is None:
-            import random, string as _string
-            given_name = request.data.get("given_name", "")
-            family_name = request.data.get("family_name", "")
-            full_name = request.data.get("name", "") or f"{given_name} {family_name}".strip() or email.split("@")[0]
+            full_name = id_info.get("name", "") or email.split("@")[0]
             base = email.split("@")[0].lower()
             base = "".join(c if c.isalnum() or c == "_" else "_" for c in base)[:20] or "user"
             suffix = "".join(random.choices(_string.digits, k=4))
@@ -597,15 +812,14 @@ class GoogleAuthView(APIView):
                 email=email,
                 username=username,
                 full_name=full_name,
-                password=None,  # no password — OAuth only
+                password=None,  # no password — OAuth-only account
                 email_verified=True,
                 is_active=True,
             )
-
         elif not user.is_active:
             return Response({"detail": "This account has been suspended."}, status=403)
 
-        # Issue JWT tokens
+        # Issue SRA JWT tokens
         refresh = RefreshToken.for_user(user)
         return Response({
             "access": str(refresh.access_token),

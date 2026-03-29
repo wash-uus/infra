@@ -1,10 +1,27 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import api from "../api/client";
+import ShareButton from "../components/ShareButton";
 import { useAuth } from "../context/AuthContext";
+import { usePageMeta } from "../hooks/usePageMeta";
+
+function getModerationBadge(request) {
+  if (request.status === "rejected") {
+    return <span className="badge-red shrink-0">Rejected</span>;
+  }
+  if (request.status === "pending") {
+    return <span className="badge-gold shrink-0">Pending Review</span>;
+  }
+  return null;
+}
 
 export default function PrayerPage() {
+  usePageMeta({
+    title: "Prayer Wall",
+    description:
+      "Stand in faith with thousands of intercessors across Africa. Submit prayer requests, agree together, and witness God answer.",
+  });
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -144,7 +161,7 @@ export default function PrayerPage() {
                 </button>
               </div>
               {submitted && (
-                <p className="text-sm text-emerald-400">Your prayer request has been shared. 🙏</p>
+                <p className="text-sm text-emerald-400">Your prayer request was submitted for review. 🙏</p>
               )}
               {submitError && (
                 <p className="text-sm text-red-400">{submitError}</p>
@@ -152,6 +169,21 @@ export default function PrayerPage() {
             </form>
           </div>
         )}
+
+        <div className="mb-10 rounded-3xl border border-amber-500/20 bg-zinc-950/70 p-6 shadow-xl shadow-black/20 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">Stories of Faith</p>
+              <h2 className="text-xl font-black text-white">Seen God move? Submit your testimony for review.</h2>
+              <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+                Approved stories become public and shareable. Rejected or edited stories stay protected until moderators review them again.
+              </p>
+            </div>
+            <Link to="/stories/submit" className="btn-outline justify-center px-6 py-3 text-sm">
+              Share Your Story
+            </Link>
+          </div>
+        </div>
 
         {/* Requests */}
         {loading ? (
@@ -194,8 +226,14 @@ export default function PrayerPage() {
                   <>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <h3 className="font-bold text-white">{req.title}</h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-bold text-white">{req.title}</h3>
+                          {req.is_owner ? getModerationBadge(req) : null}
+                        </div>
                         <p className="mt-1 text-sm text-zinc-500 line-clamp-3">{req.description}</p>
+                        {req.is_owner && req.status === "rejected" && req.rejection_reason ? (
+                          <p className="mt-2 text-xs leading-relaxed text-red-300">Reason: {req.rejection_reason}</p>
+                        ) : null}
                       </div>
                       {!req.is_public && <span className="badge-zinc shrink-0">Private</span>}
                     </div>
@@ -209,6 +247,9 @@ export default function PrayerPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
+                        {req.status === "approved" && req.is_public ? (
+                          <ShareButton endpoint={`/prayer/requests/${req.id}/share/`} />
+                        ) : null}
                         {req.is_owner && (
                           <>
                             <button
@@ -225,13 +266,15 @@ export default function PrayerPage() {
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={() => handlePray(req.id)}
-                          title={!isAuthenticated ? "Sign in to pray" : undefined}
-                          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
-                        >
-                          🙏 {req.prayer_count ?? 0}
-                        </button>
+                        {req.status === "approved" && req.is_public ? (
+                          <button
+                            onClick={() => handlePray(req.id)}
+                            title={!isAuthenticated ? "Sign in to pray" : undefined}
+                            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
+                          >
+                            🙏 {req.prayer_count ?? 0}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   </>

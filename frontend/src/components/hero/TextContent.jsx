@@ -24,25 +24,27 @@ export default function TextContent() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="mb-4 rounded-full border border-amber-500/30 bg-black/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-amber-400"
       >
-        Acts 1:7–9
+        Spirit Revival Africa
       </motion.p>
 
       <motion.h1
         initial={reduceMotion ? false : { opacity: 0, y: 18 }}
         animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
         transition={{ duration: 1, ease: "easeOut", delay: 0.05 }}
-        className="text-4xl font-black leading-tight text-white drop-shadow-[0_0_18px_rgba(212,175,55,0.18)] sm:text-6xl lg:text-7xl"
+        className="text-4xl font-black leading-tight text-white drop-shadow-[0_0_18px_rgba(212,175,55,0.18)] sm:text-5xl lg:text-6xl"
       >
-        Spirit Revival Africa
+        The Fire Is Already Burning.
+        <br className="hidden sm:block" />
+        Will You Carry It?
       </motion.h1>
 
       <motion.p
         initial={reduceMotion ? false : { opacity: 0, y: 18 }}
         animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
         transition={{ duration: 1, ease: "easeOut", delay: 0.12 }}
-        className="mt-5 max-w-3xl text-base leading-relaxed text-zinc-200 sm:text-xl"
+        className="mt-5 max-w-2xl text-base leading-relaxed text-zinc-300 sm:text-lg"
       >
-        Reigniting the Power of the Holy Spirit Across Africa
+        A movement training the next generation of African believers to pray deeper, preach bolder, and impact their generation.
       </motion.p>
 
       <CTAButtons />

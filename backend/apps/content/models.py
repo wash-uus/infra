@@ -232,15 +232,39 @@ class DailyBread(models.Model):
 
 
 class ShortStory(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending Review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
     title = models.CharField(max_length=180)
     story = models.TextField()
     author_name = models.CharField(max_length=120, blank=True)
+    submitter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="submitted_stories",
+        help_text="Set when submitted by a registered user (not admin-created).",
+    )
     photo = models.ImageField(
         upload_to="short-stories/",
         blank=True,
         null=True,
         help_text="Optional featured image displayed with the story.",
     )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.APPROVED, db_index=True,
+        help_text="Admin-created stories default to approved. User submissions default to pending.",
+    )
+    rejection_reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_stories",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     is_published = models.BooleanField(default=True)
     published_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -250,6 +274,7 @@ class ShortStory(models.Model):
         ordering = ["-published_at", "-created_at"]
         indexes = [
             models.Index(fields=["is_published", "published_at"]),
+            models.Index(fields=["status"]),
         ]
 
     def __str__(self):

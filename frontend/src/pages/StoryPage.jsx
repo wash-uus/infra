@@ -2,13 +2,13 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import { getShortStoryById } from "../api/homeContent";
+import ShareButton from "../components/ShareButton";
 
 export default function StoryPage() {
   const { id } = useParams();
   const [story, setStory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [shareStatus, setShareStatus] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -35,36 +35,6 @@ export default function StoryPage() {
       mounted = false;
     };
   }, [id]);
-
-  const handleShareStory = async () => {
-    const storyUrl = window.location.href;
-    const sharePayload = {
-      title: story?.title || "Short Story",
-      text: `Read this story: ${story?.title || "Short Story"}`,
-      url: storyUrl,
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(sharePayload);
-        setShareStatus("Shared successfully!");
-      } else {
-        await navigator.clipboard.writeText(storyUrl);
-        setShareStatus("Link copied!");
-      }
-    } catch {
-      try {
-        await navigator.clipboard.writeText(storyUrl);
-        setShareStatus("Link copied!");
-      } catch {
-        setShareStatus("Could not share story.");
-      }
-    }
-
-    window.setTimeout(() => {
-      setShareStatus("");
-    }, 2000);
-  };
 
   if (loading) {
     return (
@@ -100,14 +70,11 @@ export default function StoryPage() {
             {story.author_name || "Spirit Revival Africa"}
           </p>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleShareStory}
+            <ShareButton
+              endpoint={`/content/short-stories/${story.id}/share/`}
+              label="Share story"
               className="rounded-lg border border-amber-500/40 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-amber-300 transition hover:border-amber-400 hover:text-amber-200"
-            >
-              Share story
-            </button>
-            {shareStatus ? <span className="text-xs text-zinc-400">{shareStatus}</span> : null}
+            />
           </div>
         </div>
         <p className="whitespace-pre-line text-base leading-relaxed text-zinc-300">{story.story}</p>

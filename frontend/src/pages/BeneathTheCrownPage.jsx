@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { bookMeta, aboutAuthor, parts, introduction } from "../data/beneathTheCrown";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 /* ── Helpers ── */
 function openWhatsApp() {
@@ -58,6 +59,11 @@ function ChapterCard({ chapter }) {
 
 
 export default function BeneathTheCrownPage() {
+  usePageMeta({
+    title: "Beneath the Crown — By W. Washika",
+    description:
+      "A 12-chapter journey from the cross into the throne room of God. Beneath the Crown by W. Washika — now available. KSH 1,200.",
+  });
   const [showMore, setShowMore] = useState(false);
 
   const chapterOneTeaser = parts[0].chapters[0].paragraphs[0];

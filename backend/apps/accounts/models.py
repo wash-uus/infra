@@ -13,6 +13,10 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
     email_verified = models.BooleanField(default=False)
+    is_approved = models.BooleanField(
+        default=True,
+        help_text="Admin approval required before user can access the platform.",
+    )
 
     full_name = models.CharField(max_length=140, blank=True)
     phone = models.CharField(max_length=32, blank=True)

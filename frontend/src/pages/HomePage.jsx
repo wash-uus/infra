@@ -3,30 +3,20 @@ import { useEffect, useState } from "react";
 import HeroSection from "../components/hero/HeroSection";
 import { getHomeFeed } from "../api/homeContent";
 import AnnouncementBanner from "../components/AnnouncementBanner";
-import api from "../api/client";
 
 const features = [
-  { icon: "📖", title: "Content Library", description: "Dive into books, sermons, teachings, videos and daily scripture curated by revivalists across the continent.", link: "/content" },
-  { icon: "🔥", title: "Revival Hubs", description: "Centres of fire are rising across Africa. Find a hub near you — or pioneer one in your city.", link: "/hubs" },
-  { icon: "🙏", title: "Prayer Network", description: "Lift your voice with thousands of intercessors. Submit requests, agree in faith, and witness answered prayer.", link: "/prayer" },
+  { icon: "�", title: "Prayer Network", description: "Lift your voice with intercessors across Africa. Submit requests, agree in faith, and witness answered prayer.", link: "/prayer" },
+  { icon: "📖", title: "Content Library", description: "Sermons, teachings, and daily scripture curated by revivalists across the continent.", link: "/content" },
   { icon: "👥", title: "Community Groups", description: "Youths, women, worshippers, preachers, intercessors — your tribe is already here. Join the circle.", link: "/groups" },
-  { icon: "🎓", title: "Discipleship", description: "Grow deeper in your walk with structured courses, video lessons and progress tracking designed for every believer.", link: "/discipleship" },
-  { icon: "💬", title: "Live Messaging", description: "Stay connected with your community through real-time direct messages and group conversations across the network.", link: "/messages" },
+  { icon: "🎓", title: "Discipleship Courses", description: "Grow deeper in your walk with structured courses and lessons designed for every believer.", link: "/discipleship" },
 ];
 
-const FALLBACK_STATS = [
-  { key: "nations_count", label: "African Nations Reached" },
-  { key: "groups_count", label: "Ministry Groups" },
-  { key: "users_count", label: "Community Members" },
-  { key: "testimonies_count", label: "Testimonies Shared" },
-];
 
 export default function HomePage() {
   const [dailyBread, setDailyBread] = useState(null);
   const [stories, setStories] = useState([]);
   const [activeStory, setActiveStory] = useState(null);
   const [verseExpanded, setVerseExpanded] = useState(false);
-  const [platformStats, setPlatformStats] = useState(null);
   const VERSE_LIMIT = 280;
 
   useEffect(() => {
@@ -50,12 +40,6 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    api.get("/common/platform-stats/")
-      .then(({ data }) => setPlatformStats(data))
-      .catch(() => { /* non-critical, fallback to null */ });
-  }, []);
-
-  useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         setActiveStory(null);
@@ -65,17 +49,7 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const visibleStories = stories.length
-    ? stories
-    : [
-      {
-        id: "fallback-story",
-        title: "Faith in Action",
-        story:
-          "A small prayer circle in one city became a weekly outreach movement in three neighborhoods. Keep showing up in prayer and obedience.",
-        author_name: "SRA Team",
-      },
-    ];
+  const visibleStories = stories.length ? stories : [];
 
   const storyExcerpt = (text, max = 180) => {
     if (!text) return "";
@@ -91,38 +65,12 @@ export default function HomePage() {
         <AnnouncementBanner />
       </section>
 
-      {/* SCROLLING VERSE — Acts 1:7-9 */}
-      <section className="mt-8 mb-4 overflow-hidden border-y border-purple-800/40 bg-purple-950/25 py-5 select-none">
-        <div className="flex whitespace-nowrap animate-marquee">
-          {[...Array(4)].map((_, i) => (
-            <span key={i} className="inline-flex items-center gap-6 px-12 text-sm font-black tracking-widest uppercase text-purple-300 sm:text-base">
-              <span className="text-purple-500 text-lg">✦</span>
-              AND HE SAID UNTO THEM, IT IS NOT FOR YOU TO KNOW THE TIMES OR THE SEASONS, WHICH THE FATHER HATH PUT IN HIS OWN POWER.
-              <span className="text-purple-200 mx-1">BUT YE SHALL RECEIVE POWER, AFTER THAT THE HOLY GHOST IS COME UPON YOU:</span>
-              AND YE SHALL BE WITNESSES UNTO ME BOTH IN JERUSALEM, AND IN ALL JUDAEA, AND IN SAMARIA, AND UNTO THE UTTERMOST PART OF THE EARTH.
-              AND WHEN HE HAD SPOKEN THESE THINGS, WHILE THEY BEHELD, HE WAS TAKEN UP; AND A CLOUD RECEIVED HIM OUT OF THEIR SIGHT.
-              <span className="text-purple-400 italic normal-case ml-2">— Acts 1:7–9 (KJV)</span>
-              <span className="text-purple-600 text-lg mx-6">✦</span>
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* STATS */}
-      <section className="mx-auto max-w-7xl px-6 pb-20">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-800/60 bg-zinc-800/30 md:grid-cols-4">
-          {FALLBACK_STATS.map(({ key, label }) => {
-            const value = platformStats ? platformStats[key] : null;
-            return (
-              <div key={key} className="bg-zinc-950 px-6 py-8 text-center">
-                <p className="mb-1 bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-4xl font-black text-transparent">
-                  {value !== null && value !== undefined ? value.toLocaleString() : "—"}
-                </p>
-                <p className="text-sm text-zinc-500">{label}</p>
-              </div>
-            );
-          })}
-        </div>
+      {/* VERSE ANCHOR */}
+      <section className="mx-auto max-w-3xl px-6 py-10 text-center">
+        <blockquote className="text-lg font-semibold italic leading-relaxed text-zinc-400 sm:text-xl">
+          &ldquo;But ye shall receive power, after that the Holy Ghost is come upon you: and ye shall be witnesses unto me both in Jerusalem, and in all Judaea, and in Samaria, and unto the uttermost part of the earth.&rdquo;
+        </blockquote>
+        <cite className="mt-3 block text-xs font-semibold not-italic uppercase tracking-widest text-amber-500">— Acts 1:8 KJV</cite>
       </section>
 
       {/* FOUNDER */}
@@ -255,13 +203,20 @@ export default function HomePage() {
           <p className="mt-3 text-zinc-400">Moments of grace, breakthrough and revival from hearts across the movement.</p>
         </div>
 
+        {visibleStories.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/50 p-12 text-center">
+            <p className="mb-2 text-3xl">✍️</p>
+            <p className="font-bold text-white">Stories are coming.</p>
+            <p className="mt-1 text-sm text-zinc-500 max-w-sm mx-auto">Be the first to share what God has been doing in your life.</p>
+            <Link to="/stories/submit" className="mt-5 inline-block btn-gold py-2 px-5 text-sm">Share Your Story</Link>
+          </div>
+        ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {visibleStories.map((story) => (
             <article
               key={story.id}
               className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/30 hover:shadow-amber-900/20 hover:shadow-xl"
             >
-              {/* Photo */}
               {story.photo_url ? (
                 <div className="relative h-48 w-full overflow-hidden">
                   <img
@@ -297,6 +252,7 @@ export default function HomePage() {
             </article>
           ))}
         </div>
+        )}
       </section>
 
       {activeStory ? (
@@ -376,6 +332,39 @@ export default function HomePage() {
           </article>
         </div>
       ) : null}
+
+      {/* SUPPORT THE MOVEMENT — PayPal */}
+      <section className="mx-auto max-w-5xl px-6 pb-24">
+        <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-950/40 via-zinc-950 to-zinc-950 p-8 sm:p-12 text-center shadow-xl shadow-amber-900/10">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 -bottom-16 h-64 w-64 rounded-full bg-yellow-500/10 blur-3xl" />
+          <div className="relative">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Partner With Us</p>
+            <h2 className="mb-3 text-3xl font-black text-white sm:text-4xl">Support the Movement</h2>
+            <p className="mx-auto mb-2 max-w-xl text-sm leading-relaxed text-zinc-400">
+              Every contribution fuels revival across Africa — helping us reach more souls, equip more leaders,
+              and spread the fire of the Holy Spirit to every nation.
+            </p>
+            <p className="mx-auto mb-8 max-w-lg text-xs text-zinc-500 italic">
+              "Give, and it will be given to you." — Luke 6:38
+            </p>
+            <a
+              href="https://www.paypal.com/paypalme/wwashika9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 rounded-2xl bg-[#0070ba] hover:bg-[#003087] px-8 py-4 text-base font-bold text-white shadow-lg transition-all hover:scale-105 active:scale-95 hover:shadow-blue-900/40 hover:shadow-xl"
+            >
+              <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.26-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.477z"/>
+              </svg>
+              Donate via PayPal
+            </a>
+            <p className="mt-4 text-xs text-zinc-600">
+              Secure payment via PayPal · <span className="text-zinc-500">wwashika9@gmail.com</span>
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* CTA */}
       <section className="mx-auto max-w-3xl px-6 pb-32 text-center">

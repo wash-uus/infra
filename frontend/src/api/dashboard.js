@@ -19,6 +19,25 @@ export const suspendUser = (id, reason) =>
 export const reactivateUser = (id) =>
   api.post(`/accounts/users/${id}/reactivate/`);
 
+// Account approval
+export const getPendingApprovals = () => api.get("/accounts/users/pending-approval/");
+export const approveUser = (id) => api.post(`/accounts/users/${id}/approve/`);
+export const rejectUser = (id, reason) => api.post(`/accounts/users/${id}/reject/`, { reason });
+
+// Group join requests
+export const getGroupJoinRequests = (groupId) =>
+  api.get("/groups/join-requests/", { params: groupId ? { group: groupId } : {} });
+export const approveJoinRequest = (reqId) =>
+  api.post(`/groups/join-requests/${reqId}/approve/`);
+export const rejectJoinRequest = (reqId) =>
+  api.post(`/groups/join-requests/${reqId}/reject/`);
+
+// Admin messaging
+export const adminSendMessage = (userId, text) =>
+  api.post(`/accounts/admin/message-user/${userId}/`, { text });
+export const adminBroadcast = (text) =>
+  api.post("/accounts/admin/broadcast/", { text });
+
 // Super Admin
 export const getSuperAdminStats = () => api.get("/accounts/superadmin/stats/");
 

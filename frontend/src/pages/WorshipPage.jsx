@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getWorshipTeams, recordPlay, submitJoinRequest } from "../api/worship";
-import { useAuth } from "../context/AuthContext";
-
+import { useAuth } from "../context/AuthContext";import { usePageMeta } from "../hooks/usePageMeta";
 /* ── Helpers ─────────────────────────────────────────────────── */
 const ROLE_ICON = { vocalist: "🎤", instrumentalist: "🎸" };
 const ROLE_COLOR = {
@@ -130,6 +129,11 @@ function TrackCard({ track }) {
 
 /* ── Main Page ───────────────────────────────────────────────── */
 export default function WorshipPage() {
+  usePageMeta({
+    title: "Shouts of Joy Melodies — Worship Team",
+    description:
+      "The official worship team of Spirit Revival Africa. Spirit-filled instrumentalists and vocalists uniting to ignite revival through worship.",
+  });
   const { user } = useAuth();
   const [teams, setTeams] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);

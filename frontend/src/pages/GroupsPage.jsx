@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 const groupIcons = {
   youths: "⚡",
@@ -31,6 +32,11 @@ function Toast({ msg, err }) {
 }
 
 export default function GroupsPage() {
+  usePageMeta({
+    title: "Ministry Groups",
+    description:
+      "Youths, women, worshippers, preachers, intercessors — find your tribe and join a community built for your role in the Kingdom.",
+  });
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

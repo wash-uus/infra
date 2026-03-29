@@ -1,10 +1,17 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
+import React, { Suspense } from "react";
 
 import Layout from "../components/Layout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import ContentPage from "../pages/ContentPage";
-import CoursePage from "../pages/CoursePage";
-import LessonPage from "../pages/LessonPage";
+import PageLoader from "../components/PageLoader";
+
+// Heavy pages — lazy loaded with code splitting
+const ContentPage = React.lazy(() => import("../pages/ContentPage"));
+const CoursePage = React.lazy(() => import("../pages/CoursePage"));
+const LessonPage = React.lazy(() => import("../pages/LessonPage"));
+const GalleryPage = React.lazy(() => import("../pages/GalleryPage"));
+
+// Standard pages — imported normally
 import DiscipleshipPage from "../pages/DiscipleshipPage";
 import GroupsPage from "../pages/GroupsPage";
 import HomePage from "../pages/HomePage";
@@ -14,7 +21,7 @@ import MessagesPage from "../pages/MessagesPage";
 import PrayerPage from "../pages/PrayerPage";
 import RegisterPage from "../pages/RegisterPage";
 import StoryPage from "../pages/StoryPage";
-import GalleryPage from "../pages/GalleryPage";
+import StorySubmissionPage from "../pages/StorySubmissionPage";
 import WorshipPage from "../pages/WorshipPage";
 import BeneathTheCrownPage from "../pages/BeneathTheCrownPage";
 import NotFoundPage from "../pages/NotFoundPage";
@@ -37,8 +44,22 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: "content", element: <ContentPage /> },
-      { path: "gallery", element: <GalleryPage /> },
+      {
+        path: "content",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ContentPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "gallery",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <GalleryPage />
+          </Suspense>
+        ),
+      },
       { path: "groups", element: <GroupsPage /> },
       {
         path: "messages",
@@ -50,11 +71,26 @@ export const router = createBrowserRouter([
       },
       { path: "prayer", element: <PrayerPage /> },
       { path: "discipleship", element: <DiscipleshipPage /> },
-      { path: "discipleship/course/:courseId", element: <CoursePage /> },
-      { path: "discipleship/course/:courseId/lesson/:lessonId", element: <LessonPage /> },
+      {
+        path: "discipleship/course/:courseId",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <CoursePage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "discipleship/course/:courseId/lesson/:lessonId",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <LessonPage />
+          </Suspense>
+        ),
+      },
       { path: "hubs", element: <HubsPage /> },
       { path: "worship", element: <WorshipPage /> },
       { path: "book/beneath-the-crown", element: <BeneathTheCrownPage /> },
+      { path: "stories/submit", element: <StorySubmissionPage /> },
       { path: "stories/:id", element: <StoryPage /> },
       {
         path: "profile",

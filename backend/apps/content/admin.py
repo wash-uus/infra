@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.utils import timezone
 from django.utils.html import format_html
 
+from apps.common.utils import log_action, send_notification
 from apps.content.models import ContentItem, DailyBread, FetchedPhoto, GalleryItem, ShortStory, UserPhoto
 
 
@@ -311,17 +313,28 @@ class GalleryItemAdmin(admin.ModelAdmin):
 
 @admin.register(ShortStory)
 class ShortStoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "author_name", "photo_thumb", "is_published", "published_at", "updated_at")
-    list_filter = ("is_published", "published_at")
-    search_fields = ("title", "story", "author_name")
-    readonly_fields = ("created_at", "updated_at", "photo_preview")
+    list_display = (
+        "id",
+        "title",
+        "submitter",
+        "status",
+        "is_published",
+        "published_at",
+        "updated_at",
+    )
+    list_filter = ("status", "is_published", "published_at")
+    search_fields = ("title", "story", "author_name", "submitter__email", "submitter__full_name")
+    readonly_fields = ("created_at", "updated_at", "photo_preview", "reviewed_by", "reviewed_at")
     ordering = ("-published_at", "-updated_at")
-    list_editable = ("is_published",)
+    actions = ["approve_selected", "reject_selected"]
 
     fieldsets = (
-        ("Story", {"fields": ("title", "story", "author_name")}),
+        ("Story", {"fields": ("title", "story", "author_name", "submitter")}),
+        ("Moderation", {
+            "fields": ("status", "rejection_reason", "reviewed_by", "reviewed_at", "is_published", "published_at"),
+            "description": "Set status to approve or reject. Submitters receive a notification on change.",
+        }),
         ("Featured Photo", {"fields": ("photo_preview", "photo")}),
-        ("Publish", {"fields": ("is_published", "published_at")}),
         ("Meta", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
@@ -342,4 +355,85 @@ class ShortStoryAdmin(admin.ModelAdmin):
                 obj.photo.url,
             )
         return "No photo uploaded"
+
+    @admin.action(description="✅ Approve selected stories")
+    def approve_selected(self, request, queryset):
+        updated = 0
+        for story in queryset.filter(status=ShortStory.Status.PENDING):
+            story.status = ShortStory.Status.APPROVED
+            story.rejection_reason = ""
+            story.is_published = True
+            story.reviewed_by = request.user
+            story.reviewed_at = timezone.now()
+            story.save(update_fields=[
+                "status",
+                "rejection_reason",
+                "is_published",
+                "reviewed_by",
+                "reviewed_at",
+            ])
+            if story.submitter:
+                send_notification(
+                    story.submitter,
+                    "Your story is live ✓",
+                    f'"{story.title}" has been approved and is now public.',
+                    notif_type="approved",
+                    link="/content",
+                )
+                log_action(request.user, "story.approve", "ShortStory", story.pk, detail=story.title)
+            updated += 1
+        self.message_user(request, f"{updated} story(ies) approved.")
+
+    @admin.action(description="🚫 Reject selected stories")
+    def reject_selected(self, request, queryset):
+        updated = 0
+        for story in queryset.exclude(status=ShortStory.Status.REJECTED):
+            story.status = ShortStory.Status.REJECTED
+            story.is_published = False
+            story.reviewed_by = request.user
+            story.reviewed_at = timezone.now()
+            story.save(update_fields=["status", "is_published", "reviewed_by", "reviewed_at"])
+            if story.submitter:
+                send_notification(
+                    story.submitter,
+                    "Update on your story",
+                    f'Your story "{story.title}" was not approved.',
+                    notif_type="rejected",
+                    link="/content",
+                )
+                log_action(request.user, "story.reject", "ShortStory", story.pk, detail=story.title)
+            updated += 1
+        self.message_user(request, f"{updated} story(ies) rejected.")
+
+    def save_model(self, request, obj, form, change):
+        status_changed = change and "status" in form.changed_data
+        if status_changed:
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+        super().save_model(request, obj, form, change)
+        if status_changed:
+            approved = obj.status == ShortStory.Status.APPROVED
+            obj.is_published = approved
+            obj.save(update_fields=["is_published"])
+        if status_changed and obj.submitter and obj.status in {ShortStory.Status.APPROVED, ShortStory.Status.REJECTED}:
+            approved = obj.status == ShortStory.Status.APPROVED
+            send_notification(
+                obj.submitter,
+                "Your story is live ✓" if approved else "Update on your story",
+                (
+                    f'"{obj.title}" has been approved and is now public.'
+                    if approved
+                    else f'Your story "{obj.title}" was not approved.'
+                    + (f" Reason: {obj.rejection_reason}" if obj.rejection_reason else "")
+                ),
+                notif_type="approved" if approved else "rejected",
+                link="/content",
+            )
+            log_action(
+                request.user,
+                "story.approve" if approved else "story.reject",
+                "ShortStory",
+                obj.pk,
+                detail=obj.title,
+            )
 

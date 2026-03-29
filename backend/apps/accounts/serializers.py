@@ -1,11 +1,36 @@
+import json
+import random
+import string
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import signing
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-import json
-import random
-import string
+
+
+# Magic byte signatures for allowed image formats
+_IMAGE_MAGIC = {
+    b"\xff\xd8\xff": "jpeg",          # JPEG
+    b"\x89PNG\r\n\x1a\n": "png",      # PNG
+    b"RIFF": "webp",                    # WebP (also needs bytes[8:12] == b'WEBP')
+}
+
+
+def _validate_image_magic_bytes(file_obj):
+    """Read the first 12 bytes and verify the file is actually a JPEG, PNG, or WebP.
+    Raises serializers.ValidationError on failure. Resets file pointer afterward."""
+    header = file_obj.read(12)
+    file_obj.seek(0)
+
+    is_jpeg = header[:3] == b"\xff\xd8\xff"
+    is_png = header[:8] == b"\x89PNG\r\n\x1a\n"
+    is_webp = header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+
+    if not (is_jpeg or is_png or is_webp):
+        raise serializers.ValidationError(
+            {"profile_picture": "Only JPEG, PNG, or WebP images are allowed. Upload rejected."}
+        )
 
 User = get_user_model()
 
@@ -41,6 +66,15 @@ class UserSerializer(serializers.ModelSerializer):
         return super().to_internal_value(mutable)
 
     def update(self, instance, validated_data):
+        # Validate profile picture magic bytes on update too
+        pic = validated_data.get("profile_picture")
+        if pic:
+            if pic.size > 2 * 1024 * 1024:
+                raise serializers.ValidationError(
+                    {"profile_picture": "Profile picture must be under 2 MB."}
+                )
+            _validate_image_magic_bytes(pic)
+
         old_pic_name = instance.profile_picture.name if instance.profile_picture else None
         instance = super().update(instance, validated_data)
         new_pic_name = instance.profile_picture.name if instance.profile_picture else None
@@ -57,7 +91,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "username", "email", "role",
-            "email_verified", "full_name", "phone", "gender",
+            "email_verified", "is_approved", "full_name", "phone", "gender",
             "bio", "country", "city",
             "born_again", "year_of_salvation", "church_name",
             "denomination", "serves_in_church", "ministry_areas", "testimony",
@@ -110,19 +144,14 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         password = validated_data.pop("password")
 
-        # ── Validate profile picture ──────────────────────────────────────────
+        # ── Validate profile picture (magic bytes, not client MIME header) ──────
         pic = validated_data.get("profile_picture")
         if pic:
-            allowed_types = {"image/jpeg", "image/png", "image/webp"}
-            content_type = getattr(pic, "content_type", "")
-            if content_type not in allowed_types:
-                raise serializers.ValidationError(
-                    {"profile_picture": "Only JPEG, PNG, or WebP images are allowed."}
-                )
             if pic.size > 2 * 1024 * 1024:  # 2 MB
                 raise serializers.ValidationError(
                     {"profile_picture": "Profile picture must be under 2 MB."}
                 )
+            _validate_image_magic_bytes(pic)
 
         # ── Safe username generation ──────────────────────────────────────────
         raw_username = validated_data.get("username", "")
@@ -164,6 +193,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         user = User(**validated_data)
         user.set_password(password)
+        user.is_approved = False  # Requires admin approval after email verification
         user.save()
         return user
 
@@ -178,6 +208,10 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not django_settings.DEBUG and not self.user.email_verified:
             raise serializers.ValidationError(
                 {"detail": "Please verify your email address before logging in. Check your inbox for the verification link."}
+            )
+        if not django_settings.DEBUG and not self.user.is_approved:
+            raise serializers.ValidationError(
+                {"detail": "Your account is pending admin approval. You will be notified once approved."}
             )
         return data
 

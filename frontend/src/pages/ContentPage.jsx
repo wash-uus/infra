@@ -2,6 +2,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import api from "../api/client";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 /* -- Constants ----------------------------------------------------------- */
 const TYPE_FILTERS = [
@@ -208,6 +209,11 @@ function ContentCard({ item }) {
 
 /* -- Page ---------------------------------------------------------------- */
 export default function ContentPage() {
+  usePageMeta({
+    title: "Content Library",
+    description:
+      "Books, sermons, videos, journals, wisdom and daily scripture from Africa's growing revival movement.",
+  });
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);

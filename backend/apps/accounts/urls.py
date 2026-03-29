@@ -11,6 +11,7 @@ from apps.accounts.views import (
     ModeratorStatsView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
+    PendingApprovalsView,
     ProfileView,
     RegisterView,
     SuperAdminStatsView,
@@ -18,10 +19,14 @@ from apps.accounts.views import (
     UserListView,
     UserSearchView,
     VerifyEmailView,
+    approve_user,
+    reject_user,
     promote_user_role,
     reactivate_user,
     site_statistics,
     suspend_user,
+    admin_send_message,
+    admin_broadcast_message,
 )
 
 urlpatterns = [
@@ -52,6 +57,15 @@ urlpatterns = [
     path("users/<int:user_id>/suspend/", suspend_user, name="suspend_user"),
     path("users/<int:user_id>/reactivate/", reactivate_user, name="reactivate_user"),
     path("users/search/", UserSearchView.as_view(), name="user_search"),
+
+    # Account approval (admin+)
+    path("users/pending-approval/", PendingApprovalsView.as_view(), name="pending_approvals"),
+    path("users/<int:user_id>/approve/", approve_user, name="approve_user"),
+    path("users/<int:user_id>/reject/", reject_user, name="reject_user"),
+
+    # Admin messaging
+    path("admin/message-user/<int:user_id>/", admin_send_message, name="admin_send_message"),
+    path("admin/broadcast/", admin_broadcast_message, name="admin_broadcast"),
 
     # Legacy compat
     path("site-stats/", site_statistics, name="site_statistics"),

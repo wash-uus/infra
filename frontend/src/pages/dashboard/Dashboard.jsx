@@ -28,6 +28,14 @@ import {
   resolveAppeal,
   reviewAction,
   suspendUser,
+  getPendingApprovals,
+  approveUser,
+  rejectUser,
+  getGroupJoinRequests,
+  approveJoinRequest,
+  rejectJoinRequest,
+  adminSendMessage,
+  adminBroadcast,
 } from "../../api/dashboard";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -617,12 +625,26 @@ function UserRow({ user, onPromote, onSuspend, onReactivate, allowSuperAdmin }) 
   );
 }
 
-function AdminView({ stats, isSuperAdmin, reviews, appeals, onReviewAction, onAppeal, showToast, showConfirm }) {
+function AdminView({ stats, isSuperAdmin, reviews, appeals, initialPendingApprovals = [], onReviewAction, onAppeal, showToast, showConfirm }) {
   const [tab, setTab] = useState("overview");
 
   // Users tab
   const [users, setUsers] = useState([]);
   const [userQuery, setUserQuery] = useState("");
+
+  // Pending approvals tab
+  const [pendingUsers, setPendingUsers] = useState(initialPendingApprovals);
+  const [pendingLoaded, setPendingLoaded] = useState(initialPendingApprovals.length > 0);
+
+  // Group join requests tab
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [joinLoaded, setJoinLoaded] = useState(false);
+
+  // Messaging tab
+  const [msgTarget, setMsgTarget] = useState("");
+  const [msgText, setMsgText] = useState("");
+  const [broadcastText, setBroadcastText] = useState("");
+  const [msgBusy, setMsgBusy] = useState(false);
 
   // Admins tab (super_admin only)
   const [admins, setAdmins] = useState([]);
@@ -633,6 +655,22 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, onReviewAction, onAp
   const [auditPage, setAuditPage] = useState(1);
   const [auditHasMore, setAuditHasMore] = useState(true);
   const [auditLoaded, setAuditLoaded] = useState(false);
+
+  // ── Pending approvals ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (tab !== "approvals" || pendingLoaded) return;
+    getPendingApprovals()
+      .then(r => { setPendingUsers(r.data.results ?? r.data); setPendingLoaded(true); })
+      .catch(() => showToast("Failed to load pending approvals", true));
+  }, [tab, pendingLoaded, showToast]);
+
+  // ── Group join requests ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (tab !== "joinreqs" || joinLoaded) return;
+    getGroupJoinRequests()
+      .then(r => { setJoinRequests(r.data.results ?? r.data); setJoinLoaded(true); })
+      .catch(() => showToast("Failed to load join requests", true));
+  }, [tab, joinLoaded, showToast]);
 
   // ── User search ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -763,11 +801,14 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, onReviewAction, onAp
   const roleBreakdown = isSuper ? stats?.users_by_role          : stats?.users?.by_role;
 
   const tabs = [
-    { id: "overview", label: "Overview" },
-    { id: "users",    label: "Users" },
-    { id: "reviews",  label: "Reviews",  badge: reviews.length },
-    { id: "appeals",  label: "Appeals",  badge: appeals.length },
-    ...(isSuper ? [
+    { id: "overview",  label: "Overview" },
+    { id: "approvals", label: "Approvals", badge: pendingUsers.length },
+    { id: "users",     label: "Users" },
+    { id: "joinreqs",  label: "Join Requests", badge: joinRequests.length },
+    { id: "messaging", label: "Messaging" },
+    { id: "reviews",   label: "Reviews",  badge: reviews.length },
+    { id: "appeals",   label: "Appeals",  badge: appeals.length },
+    ...(isSuperAdmin ? [
       { id: "admins", label: "Admins" },
       { id: "audit",  label: "Audit Log" },
     ] : []),
@@ -923,6 +964,204 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, onReviewAction, onAp
         </div>
       )}
 
+      {/* ── PENDING APPROVALS ─────────────────────────────────────────────── */}
+      {tab === "approvals" && (
+        <Section title="Pending Account Approvals">
+          <p className="text-xs text-zinc-600 mb-4">
+            These users have verified their email and are waiting for admin approval before they can sign in.
+          </p>
+          {pendingUsers.length === 0 ? (
+            <p className="py-10 text-center text-sm text-zinc-600">No pending approvals. Inbox is clear!</p>
+          ) : (
+            <div className="space-y-3">
+              {pendingUsers.map(u => (
+                <div key={u.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">{u.full_name || u.username}</p>
+                      <p className="text-xs text-zinc-500">{u.email}</p>
+                      {u.phone && <p className="text-xs text-zinc-600 mt-0.5">📱 {u.phone}</p>}
+                      {u.country && <p className="text-xs text-zinc-600">{u.city ? `${u.city}, ` : ""}{u.country}</p>}
+                    </div>
+                    <p className="text-[11px] text-zinc-700 shrink-0">{new Date(u.date_joined).toLocaleDateString()}</p>
+                  </div>
+                  {u.why_join && (
+                    <p className="text-xs text-zinc-400 border-l-2 border-amber-500/40 pl-3 mb-3 italic">
+                      "{u.why_join.slice(0, 200)}{u.why_join.length > 200 ? "…" : ""}"
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => approveUser(u.id).then(() => {
+                        setPendingUsers(prev => prev.filter(x => x.id !== u.id));
+                        showToast(`${u.email} approved!`);
+                      }).catch(e => showToast(e?.response?.data?.detail ?? "Failed", true))}
+                      className="flex-1 rounded-lg border border-emerald-900/50 bg-emerald-900/10 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-900/25 transition-colors"
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        const reason = prompt("Reason for rejection (optional):");
+                        rejectUser(u.id, reason ?? "").then(() => {
+                          setPendingUsers(prev => prev.filter(x => x.id !== u.id));
+                          showToast(`${u.email} rejected`);
+                        }).catch(e => showToast(e?.response?.data?.detail ?? "Failed", true));
+                      }}
+                      className="flex-1 rounded-lg border border-red-900/50 bg-red-900/10 py-2 text-xs font-semibold text-red-400 hover:bg-red-900/25 transition-colors"
+                    >
+                      ✕ Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ── GROUP JOIN REQUESTS ───────────────────────────────────────────── */}
+      {tab === "joinreqs" && (
+        <Section title="Group Join Requests">
+          <p className="text-xs text-zinc-600 mb-4">
+            Pending requests to join private groups. Approve to add the member, reject to decline.
+          </p>
+          {joinRequests.length === 0 ? (
+            <p className="py-10 text-center text-sm text-zinc-600">No pending join requests.</p>
+          ) : (
+            <div className="space-y-3">
+              {joinRequests.map(req => (
+                <div key={req.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">{req.user_name || "—"}</p>
+                      <p className="text-xs text-zinc-500">{req.user_email}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold text-amber-400">{req.group_name}</p>
+                      <p className="text-[11px] text-zinc-700">{new Date(req.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  {req.note && (
+                    <p className="text-xs text-zinc-400 border-l-2 border-amber-500/40 pl-3 mb-3 italic">
+                      "{req.note}"
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => approveJoinRequest(req.id).then(() => {
+                        setJoinRequests(prev => prev.filter(x => x.id !== req.id));
+                        showToast(`${req.user_email} added to ${req.group_name}`);
+                      }).catch(e => showToast(e?.response?.data?.detail ?? "Failed", true))}
+                      className="flex-1 rounded-lg border border-emerald-900/50 bg-emerald-900/10 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-900/25 transition-colors"
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      onClick={() => rejectJoinRequest(req.id).then(() => {
+                        setJoinRequests(prev => prev.filter(x => x.id !== req.id));
+                        showToast(`Request rejected`);
+                      }).catch(e => showToast(e?.response?.data?.detail ?? "Failed", true))}
+                      className="flex-1 rounded-lg border border-red-900/50 bg-red-900/10 py-2 text-xs font-semibold text-red-400 hover:bg-red-900/25 transition-colors"
+                    >
+                      ✕ Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ── ADMIN MESSAGING ──────────────────────────────────────────────── */}
+      {tab === "messaging" && (
+        <div className="space-y-5">
+          {/* Individual DM */}
+          <Section title="Send Message to Specific User">
+            <p className="text-xs text-zinc-600 mb-4">
+              Enter the user's ID or email to send them a direct message from the admin account.
+            </p>
+            <div className="space-y-3">
+              <input
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-amber-500 transition-colors"
+                placeholder="User ID (number)…"
+                value={msgTarget}
+                onChange={e => setMsgTarget(e.target.value)}
+                type="number"
+                min="1"
+              />
+              <textarea
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-amber-500 transition-colors min-h-[100px] resize-y"
+                placeholder="Type your message…"
+                value={msgText}
+                onChange={e => setMsgText(e.target.value)}
+                maxLength={4000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-700">{msgText.length}/4000</span>
+                <button
+                  disabled={!msgTarget || !msgText.trim() || msgBusy}
+                  onClick={async () => {
+                    setMsgBusy(true);
+                    try {
+                      await adminSendMessage(parseInt(msgTarget, 10), msgText.trim());
+                      showToast("Message sent!");
+                      setMsgTarget("");
+                      setMsgText("");
+                    } catch (e) {
+                      showToast(e?.response?.data?.detail ?? "Failed to send", true);
+                    } finally { setMsgBusy(false); }
+                  }}
+                  className="rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-30 px-6 py-2.5 text-xs font-bold text-black transition-all"
+                >
+                  {msgBusy ? "Sending…" : "Send Message"}
+                </button>
+              </div>
+            </div>
+          </Section>
+
+          {/* Broadcast */}
+          <Section title="Broadcast to All Members">
+            <p className="text-xs text-zinc-600 mb-4">
+              This will send a direct message to <strong className="text-zinc-400">every active, approved member</strong> on the platform. Use this for announcements only.
+            </p>
+            <div className="space-y-3">
+              <textarea
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-amber-500 transition-colors min-h-[120px] resize-y"
+                placeholder="Type your broadcast announcement…"
+                value={broadcastText}
+                onChange={e => setBroadcastText(e.target.value)}
+                maxLength={4000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-700">{broadcastText.length}/4000</span>
+                <button
+                  disabled={!broadcastText.trim() || msgBusy}
+                  onClick={() => showConfirm({
+                    title: "Broadcast to all members",
+                    description: `This will send the message to ALL active members on the platform. This cannot be recalled. Are you sure?`,
+                    fn: async () => {
+                      setMsgBusy(true);
+                      try {
+                        const res = await adminBroadcast(broadcastText.trim());
+                        showToast(res.data?.detail ?? "Broadcast sent!");
+                        setBroadcastText("");
+                      } catch (e) {
+                        showToast(e?.response?.data?.detail ?? "Broadcast failed", true);
+                      } finally { setMsgBusy(false); }
+                    },
+                  })}
+                  className="rounded-lg bg-red-700 hover:bg-red-600 disabled:opacity-30 px-6 py-2.5 text-xs font-bold text-white transition-all"
+                >
+                  {msgBusy ? "Sending…" : "📢 Broadcast"}
+                </button>
+              </div>
+            </div>
+          </Section>
+        </div>
+      )}
+
       {/* ── REVIEWS ──────────────────────────────────────────────────────── */}
       {tab === "reviews" && (
         reviews.length === 0
@@ -1021,6 +1260,7 @@ export default function Dashboard() {
   const [data,     setData]     = useState(null);
   const [reviews,  setReviews]  = useState([]);
   const [appeals,  setAppeals]  = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [loadErr,  setLoadErr]  = useState(false);
   const [toast,    setToast]    = useState(null);
@@ -1050,15 +1290,17 @@ export default function Dashboard() {
         const r = await getHubLeaderStats();
         setData(r.data);
       } else if (isSuperAdmin) {
-        const [s, r, a] = await Promise.all([getSuperAdminStats(), getReviews({ status: "pending" }), getAppeals({ status: "pending" })]);
+        const [s, r, a, p] = await Promise.all([getSuperAdminStats(), getReviews({ status: "pending" }), getAppeals({ status: "pending" }), getPendingApprovals()]);
         setData(s.data);
         setReviews(r.data.results ?? r.data);
         setAppeals(a.data.results ?? a.data);
+        setPendingApprovals(p.data.results ?? p.data);
       } else if (isAdmin) {
-        const [s, r, a] = await Promise.all([getAdminStats(), getReviews({ status: "pending" }), getAppeals({ status: "pending" })]);
+        const [s, r, a, p] = await Promise.all([getAdminStats(), getReviews({ status: "pending" }), getAppeals({ status: "pending" }), getPendingApprovals()]);
         setData(s.data);
         setReviews(r.data.results ?? r.data);
         setAppeals(a.data.results ?? a.data);
+        setPendingApprovals(p.data.results ?? p.data);
       }
     } catch {
       setLoadErr(true);
@@ -1113,6 +1355,7 @@ export default function Dashboard() {
           isSuperAdmin={isSuperAdmin}
           reviews={reviews}
           appeals={appeals}
+          initialPendingApprovals={pendingApprovals}
           onReviewAction={handleReviewAction}
           onAppeal={handleAppeal}
           showToast={showToast}

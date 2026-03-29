@@ -6,8 +6,11 @@ from apps.content.views import (
 	DailyBreadPublicView,
 	GalleryPublicListView,
 	HomeFeedView,
+	ShortStoryApproveView,
 	ShortStoryPublicDetailView,
 	ShortStoryPublicListView,
+	ShortStorySubmitView,
+	StoryShareView,
 )
 
 router = DefaultRouter()
@@ -18,6 +21,9 @@ urlpatterns += [
 	path("daily-bread/", DailyBreadPublicView.as_view(), name="daily-bread"),
 	path("short-stories/", ShortStoryPublicListView.as_view(), name="short-stories"),
 	path("short-stories/<int:story_id>/", ShortStoryPublicDetailView.as_view(), name="short-story-detail"),
+	path("short-stories/<int:story_id>/share/", StoryShareView.as_view(), name="short-story-share"),
+	path("stories/submit/", ShortStorySubmitView.as_view(), name="story-submit"),
+	path("stories/<int:story_id>/<str:action_type>/", ShortStoryApproveView.as_view(), name="story-moderate"),
 	path("home-feed/", HomeFeedView.as_view(), name="home-feed"),
 	path("gallery/", GalleryPublicListView.as_view(), name="gallery"),
 ]
