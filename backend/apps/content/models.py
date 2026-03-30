@@ -236,6 +236,7 @@ class ShortStory(models.Model):
         PENDING = "pending", "Pending Review"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
+        APPEALED = "appealed", "Under Appeal"
 
     title = models.CharField(max_length=180)
     story = models.TextField()

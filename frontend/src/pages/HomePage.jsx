@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import HeroSection from "../components/hero/HeroSection";
-import { getHomeFeed } from "../api/homeContent";
+import { getHomeFeed, getTrending } from "../api/homeContent";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 
 const features = [
@@ -12,6 +12,41 @@ const features = [
 ];
 
 
+function TrendingSection() {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    getTrending()
+      .then(({ data }) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+  if (!items.length) return null;
+  return (
+    <section className="mx-auto max-w-7xl px-6 pb-24">
+      <div className="mb-8 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">🔥 Trending Now</p>
+        <h2 className="text-2xl font-black text-white">What's Moving the Movement</h2>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <Link
+            key={`${item.content_type}-${item.object_id}`}
+            to={item.link || "/"}
+            className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-amber-500/30"
+          >
+            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-amber-500">
+              {item.content_type === "story" ? "Story" : "Prayer"} · 🔥 {item.share_count} shares
+            </p>
+            <p className="font-bold text-white line-clamp-2">{item.title}</p>
+            {item.excerpt && (
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500 line-clamp-2">{item.excerpt}</p>
+            )}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const [dailyBread, setDailyBread] = useState(null);
   const [stories, setStories] = useState([]);
@@ -19,7 +54,7 @@ export default function HomePage() {
   const [verseExpanded, setVerseExpanded] = useState(false);
   const VERSE_LIMIT = 280;
 
-  useEffect(() => {
+  const fetchFeed = () => {
     let mounted = true;
     getHomeFeed({ stories_limit: 3 })
       .then(({ data }) => {
@@ -33,10 +68,20 @@ export default function HomePage() {
         setDailyBread(null);
         setStories([]);
       });
+    return () => { mounted = false; };
+  };
 
-    return () => {
-      mounted = false;
+  // Initial fetch
+  useEffect(fetchFeed, []);
+
+  // Refetch when the tab becomes visible again — so admin-added content
+  // appears the moment they switch back to the site without a full reload.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchFeed();
     };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   useEffect(() => {
@@ -332,6 +377,9 @@ export default function HomePage() {
           </article>
         </div>
       ) : null}
+
+      {/* TRENDING NOW */}
+      <TrendingSection />
 
       {/* SUPPORT THE MOVEMENT — PayPal */}
       <section className="mx-auto max-w-5xl px-6 pb-24">

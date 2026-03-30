@@ -1,17 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import api from "../api/client";
 import ShareButton from "../components/ShareButton";
+import QuickShareStrip from "../components/QuickShareStrip";
 import { useAuth } from "../context/AuthContext";
 import { usePageMeta } from "../hooks/usePageMeta";
+import { timeAgo } from "../utils/timeAgo";
 
 function getModerationBadge(request) {
+  if (request.status === "approved") {
+    return <span className="badge-green shrink-0">Published ✅</span>;
+  }
+  if (request.status === "appealed") {
+    return <span className="badge-appealed shrink-0">Under Appeal ⚖️</span>;
+  }
   if (request.status === "rejected") {
-    return <span className="badge-red shrink-0">Rejected</span>;
+    return <span className="badge-red shrink-0">Not Approved ❌</span>;
   }
   if (request.status === "pending") {
-    return <span className="badge-gold shrink-0">Pending Review</span>;
+    return <span className="badge-gold shrink-0">Under Review ⏳</span>;
   }
   return null;
 }
@@ -35,7 +43,7 @@ export default function PrayerPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const fetchRequests = useCallback(() => {
     api.get("/prayer/requests/")
       .then((r) => {
         setRequests(r.data.results || []);
@@ -44,6 +52,19 @@ export default function PrayerPage() {
       .catch(() => setRequests([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
+
+  // Auto-refetch when tab becomes visible again
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchRequests();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchRequests]);
 
   const handleLoadMore = async () => {
     if (!nextUrl || loadingMore) return;
@@ -193,8 +214,21 @@ export default function PrayerPage() {
         ) : requests.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-16 text-center">
             <p className="text-4xl mb-3">🙏</p>
-            <p className="text-zinc-400 font-semibold">No prayer requests yet</p>
-            <p className="mt-1 text-sm text-zinc-600">Be the first to share a prayer need.</p>
+            <p className="text-white font-bold text-lg">No prayers yet. Start the chain.</p>
+            <p className="mt-1 text-sm text-zinc-500">Be the first to bring a need before the community.</p>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={() => document.getElementById("prayer-form")?.scrollIntoView({ behavior: "smooth" })}
+                className="mt-5 btn-gold py-2 px-5 text-sm"
+              >
+                Submit a Prayer Request
+              </button>
+            ) : (
+              <Link to="/register" className="mt-5 inline-block btn-gold py-2 px-5 text-sm">
+                Join & Start Praying
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -243,14 +277,14 @@ export default function PrayerPage() {
                           {req.author_name || "Anonymous"}
                         </span>
                         <span className="text-xs text-zinc-600">
-                          {new Date(req.created_at).toLocaleDateString()}
+                          {timeAgo(req.created_at)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         {req.status === "approved" && req.is_public ? (
                           <ShareButton endpoint={`/prayer/requests/${req.id}/share/`} />
                         ) : null}
-                        {req.is_owner && (
+                        {req.is_owner && req.status !== "approved" && (
                           <>
                             <button
                               onClick={() => startEdit(req)}
@@ -296,6 +330,17 @@ export default function PrayerPage() {
             </button>
           </div>
         )}
+
+        {/* Quick Share Strip — invite others to the prayer wall */}
+        <div className="mt-10">
+          <QuickShareStrip
+            url="https://spiritrevivalafrica.com/prayer"
+            title="Prayer Wall — Spirit Revival Africa"
+            excerpt="Stand in faith with thousands of intercessors across Africa. Submit your prayer and agree together."
+            contentType="prayer"
+            objectId={0}
+          />
+        </div>
       </div>
     </div>
   );

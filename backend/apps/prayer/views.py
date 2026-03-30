@@ -124,7 +124,9 @@ class PrayerRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], permission_classes=[IsModeratorOrAbove])
     def reject(self, request, pk=None):
         prayer = self.get_object()
-        reason = request.data.get("reason", "")
+        reason = request.data.get("reason", "").strip()
+        if not reason:
+            return Response({"detail": "A rejection_reason is required."}, status=400)
         prayer.status = PrayerRequest.Status.REJECTED
         prayer.rejection_reason = reason
         prayer.reviewed_by = request.user
@@ -153,16 +155,19 @@ class PrayerRequestViewSet(viewsets.ModelViewSet):
         if prayer.status != PrayerRequest.Status.APPROVED or not prayer.is_public:
             return Response({"detail": "This request is not publicly shareable."}, status=404)
         frontend_url = getattr(django_settings, "FRONTEND_URL", "https://spiritrevivalafrica.com")
-        excerpt = prayer.description[:200].rstrip() + ("…" if len(prayer.description) > 200 else "")
+        prayer_url = f"{frontend_url}/prayer"
+        excerpt = prayer.description[:120].rstrip() + ("…" if len(prayer.description) > 120 else "")
+        cta_text = f"🔥 Join the movement → {frontend_url}"
         return Response({
-            "title": prayer.title,
+            "title": f"{prayer.title} — Spirit Revival Africa",
             "excerpt": excerpt,
-            "url": f"{frontend_url}/prayer",
-            "cta": "Stand in prayer → spiritrevivalafrica.com/prayer",
+            "url": prayer_url,
+            "cta": cta_text,
             "whatsapp_caption": (
                 f"🙏 *Prayer Request — Spirit Revival Africa*\n\n"
                 f"*{prayer.title}*\n\n"
                 f"{excerpt}\n\n"
-                f"Stand with us in prayer: {frontend_url}/prayer"
+                f"{cta_text}\n"
+                f"Stand with us: {prayer_url}"
             ),
         })

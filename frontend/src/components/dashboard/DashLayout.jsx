@@ -23,6 +23,7 @@ const NAV = {
     { to: "/discipleship", icon: "📖", label: "Courses" },
     { to: "/prayer", icon: "🙏", label: "Prayer Wall" },
     { to: "/messages", icon: "💬", label: "Messages" },
+    { to: "/profile/settings", icon: "⚙", label: "Profile Settings" },
   ],
   moderator: [
     { to: "/dashboard", icon: "⊞", label: "Dashboard" },
@@ -34,18 +35,21 @@ const NAV = {
     { to: "/hubs", icon: "🏛", label: "All Hubs" },
     { to: "/groups", icon: "👥", label: "Groups" },
     { to: "/messages", icon: "💬", label: "Messages" },
+    { to: "/profile/settings", icon: "⚙", label: "Profile Settings" },
   ],
   admin: [
     { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/hubs", icon: "🏛", label: "Hubs" },
     { to: "/content", icon: "📄", label: "Content" },
     { to: "/messages", icon: "💬", label: "Messages" },
+    { to: "/profile/settings", icon: "⚙", label: "Profile Settings" },
   ],
   super_admin: [
     { to: "/dashboard", icon: "⊞", label: "Dashboard" },
     { to: "/hubs", icon: "🏛", label: "Hubs" },
     { to: "/content", icon: "📄", label: "Content" },
     { to: "/messages", icon: "💬", label: "Messages" },
+    { to: "/profile/settings", icon: "⚙", label: "Profile Settings" },
   ],
 };
 

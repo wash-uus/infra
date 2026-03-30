@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import StatusBadge from "../StatusBadge";
 
 const INITIAL_FORM = {
   title: "",
@@ -24,18 +25,6 @@ function validateField(name, value) {
   return "";
 }
 
-function statusBadgeClasses(status) {
-  if (status === "approved") return "badge-green";
-  if (status === "rejected") return "badge-red";
-  return "badge-gold";
-}
-
-function statusLabel(status) {
-  if (status === "approved") return "Live";
-  if (status === "rejected") return "Rejected";
-  return "Pending Review";
-}
-
 export default function StorySubmissionForm() {
   const { isAuthenticated } = useAuth();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -45,6 +34,10 @@ export default function StorySubmissionForm() {
   const [submitError, setSubmitError] = useState("");
   const [myStories, setMyStories] = useState([]);
   const [loadingStories, setLoadingStories] = useState(true);
+  const [editingStoryId, setEditingStoryId] = useState(null);
+  const [editStoryForm, setEditStoryForm] = useState({ title: "", story: "", author_name: "", photo: null });
+  const [editStoryError, setEditStoryError] = useState("");
+  const [editStorySaving, setEditStorySaving] = useState(false);
 
   const canSubmit = useMemo(() => {
     return ["title", "submitter_name", "story"].every((field) => !validateField(field, form[field]));
@@ -70,6 +63,39 @@ export default function StorySubmissionForm() {
   useEffect(() => {
     loadMyStories();
   }, [isAuthenticated]);
+
+  const startEditStory = (storyItem) => {
+    setEditingStoryId(storyItem.id);
+    setEditStoryForm({ title: storyItem.title, story: storyItem.story, author_name: storyItem.author_name || "", photo: null });
+    setEditStoryError("");
+  };
+
+  const cancelEditStory = () => {
+    setEditingStoryId(null);
+    setEditStoryError("");
+  };
+
+  const handleEditStorySubmit = async (e) => {
+    e.preventDefault();
+    setEditStorySaving(true);
+    setEditStoryError("");
+    const payload = new FormData();
+    if (editStoryForm.title.trim()) payload.append("title", editStoryForm.title.trim());
+    if (editStoryForm.story.trim()) payload.append("story", editStoryForm.story.trim());
+    if (editStoryForm.author_name.trim()) payload.append("author_name", editStoryForm.author_name.trim());
+    if (editStoryForm.photo) payload.append("photo", editStoryForm.photo);
+    try {
+      await api.patch(`/content/stories/${editingStoryId}/edit/`, payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setEditingStoryId(null);
+      await loadMyStories();
+    } catch (err) {
+      setEditStoryError(err?.response?.data?.detail || "Could not save changes.");
+    } finally {
+      setEditStorySaving(false);
+    }
+  };
 
   const updateField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -219,16 +245,73 @@ export default function StorySubmissionForm() {
             </div>
           ) : myStories.map((storyItem) => (
             <div key={storyItem.id} className="rounded-2xl border border-zinc-800 bg-black/20 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-white">{storyItem.title}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{new Date(storyItem.created_at).toLocaleDateString()}</p>
-                </div>
-                <span className={statusBadgeClasses(storyItem.status)}>{statusLabel(storyItem.status)}</span>
-              </div>
-              {storyItem.rejection_reason ? (
-                <p className="mt-3 text-xs leading-relaxed text-red-300">Reason: {storyItem.rejection_reason}</p>
-              ) : null}
+              {editingStoryId === storyItem.id ? (
+                <form onSubmit={handleEditStorySubmit} className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-1">Edit story</p>
+                  <input
+                    type="text"
+                    value={editStoryForm.title}
+                    onChange={(e) => setEditStoryForm((p) => ({ ...p, title: e.target.value }))}
+                    placeholder="Title"
+                    className="input-dark text-sm"
+                    required
+                  />
+                  <textarea
+                    value={editStoryForm.story}
+                    onChange={(e) => setEditStoryForm((p) => ({ ...p, story: e.target.value }))}
+                    placeholder="Your story…"
+                    rows={5}
+                    className="input-dark resize-none text-sm"
+                    required
+                    minLength={50}
+                  />
+                  <input
+                    type="text"
+                    value={editStoryForm.author_name}
+                    onChange={(e) => setEditStoryForm((p) => ({ ...p, author_name: e.target.value }))}
+                    placeholder="Author name (optional)"
+                    className="input-dark text-sm"
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setEditStoryForm((p) => ({ ...p, photo: e.target.files?.[0] || null }))}
+                    className="input-dark text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500/20 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-amber-300"
+                  />
+                  {editStoryError && <p className="text-xs text-red-400">{editStoryError}</p>}
+                  <p className="text-xs text-zinc-500">Saving will reset this story to &ldquo;Under Review&rdquo; status.</p>
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={editStorySaving} className="btn-gold py-1.5 px-4 text-xs disabled:opacity-60">
+                      {editStorySaving ? "Saving…" : "Save & Resubmit"}
+                    </button>
+                    <button type="button" onClick={cancelEditStory} className="rounded-lg border border-zinc-700 px-4 py-1.5 text-xs text-zinc-400 hover:text-white transition">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-white">{storyItem.title}</p>
+                      <p className="mt-1 text-xs text-zinc-500">{new Date(storyItem.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <StatusBadge status={storyItem.status} />
+                  </div>
+                  {storyItem.rejection_reason && (
+                    <p className="mt-2 text-xs leading-relaxed text-red-300">Reason: {storyItem.rejection_reason}</p>
+                  )}
+                  {(storyItem.status === "pending" || storyItem.status === "rejected") && (
+                    <button
+                      type="button"
+                      onClick={() => startEditStory(storyItem)}
+                      className="mt-3 rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-400 transition hover:border-amber-500/40 hover:text-amber-400"
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ))}
         </div>

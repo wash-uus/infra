@@ -29,6 +29,7 @@ import VerifyEmailPage from "../pages/VerifyEmailPage";
 import ResetPasswordPage from "../pages/ResetPasswordPage";
 import Dashboard from "../pages/dashboard/Dashboard";
 import ProfilePage from "../pages/ProfilePage";
+import ProfileSettingsPage from "../pages/ProfileSettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -97,6 +98,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "profile/settings",
+        element: (
+          <ProtectedRoute>
+            <ProfileSettingsPage />
           </ProtectedRoute>
         ),
       },

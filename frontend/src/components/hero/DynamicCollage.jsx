@@ -194,15 +194,13 @@ export default function DynamicCollage() {
   const [mobileIndex, setMobileIndex] = useState(0);
 
   // ── Fetch approved hero photos ───────────────────────────────────────────
-  useEffect(() => {
+  const fetchCollage = useCallback(() => {
     let mounted = true;
 
     getHeroCollage({ limit: 24 })
       .then((res) => {
         if (!mounted) return;
         const normalised = normaliseTiles(res.data);
-        // If DB has approved photos use them; otherwise fall back to
-        // source.unsplash.com keyword URLs (no API key / registration needed).
         setTiles(normalised.length > 0 ? normalised : buildUnsplashSourceTiles());
       })
       .catch(() => {
@@ -214,6 +212,17 @@ export default function DynamicCollage() {
 
     return () => { mounted = false; };
   }, []);
+
+  useEffect(fetchCollage, [fetchCollage]);
+
+  // Refetch when admin switches back to the tab after approving photos
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchCollage();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchCollage]);
 
   // ── Mobile slideshow interval ────────────────────────────────────────────
   useEffect(() => {

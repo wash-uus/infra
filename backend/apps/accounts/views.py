@@ -146,6 +146,63 @@ class EmailLoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
 
 
+class SRATokenRefreshView(APIView):
+    """
+    POST { refresh } — thin wrapper around SimpleJWT's TokenRefreshView that
+    blocks suspended (is_active=False) or unapproved (is_approved=False) users
+    from obtaining new tokens, even with a cryptographically valid refresh token.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginThrottle]
+
+    def post(self, request):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+        raw = request.data.get("refresh", "").strip()
+        if not raw:
+            return Response({"detail": "Refresh token required."}, status=400)
+
+        # Decode to identify the user BEFORE issuing new tokens
+        try:
+            token = RefreshToken(raw)
+            user_id = token.get("user_id")
+        except (TokenError, InvalidToken):
+            return Response({"detail": "Token is invalid or expired."}, status=401)
+
+        user = User.objects.filter(id=user_id).first()
+        if user:
+            if not user.is_active:
+                return Response({"detail": "This account has been suspended."}, status=401)
+            if not settings.DEBUG and not user.is_approved:
+                return Response(
+                    {"detail": "Account pending admin approval."},
+                    status=403,
+                )
+
+        # User is cleared — rotate the token via SimpleJWT's built-in logic
+        try:
+            token.set_jti()
+            token.set_exp()
+            token.set_iat()
+            access = token.access_token
+            # Rotate: blacklist old, return new pair
+            if settings.SIMPLE_JWT.get("ROTATE_REFRESH_TOKENS", False):
+                if settings.SIMPLE_JWT.get("BLACKLIST_AFTER_ROTATION", False):
+                    try:
+                        token.blacklist()
+                    except AttributeError:
+                        pass
+                new_refresh = RefreshToken.for_user(user) if user else token
+                return Response({
+                    "access": str(access),
+                    "refresh": str(new_refresh),
+                })
+            return Response({"access": str(access)})
+        except (TokenError, InvalidToken):
+            return Response({"detail": "Token is invalid or expired."}, status=401)
+
+
 class VerifyEmailView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -499,6 +556,9 @@ def suspend_user(request, user_id):
     reason = request.data.get("reason", "Policy violation")
     user.is_active = False
     user.save(update_fields=["is_active"])
+    # Immediately invalidate all outstanding JWT tokens so cached tokens stop working
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=outstanding)
     log_action(actor=request.user, action="suspend_user",
                target_model="user", target_id=user_id,
                detail=reason, ip=get_client_ip(request))
@@ -593,6 +653,9 @@ def reject_user(request, user_id):
     reason = request.data.get("reason", "Your account did not meet our membership requirements.")
     user.is_active = False
     user.save(update_fields=["is_active"])
+    # Invalidate all outstanding JWT tokens
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=outstanding)
     log_action(actor=request.user, action="reject_user",
                target_model="user", target_id=user_id,
                detail=reason, ip=get_client_ip(request))
@@ -815,9 +878,17 @@ class GoogleAuthView(APIView):
                 password=None,  # no password — OAuth-only account
                 email_verified=True,
                 is_active=True,
+                is_approved=False,  # requires admin approval, same as email sign-up
             )
         elif not user.is_active:
             return Response({"detail": "This account has been suspended."}, status=403)
+
+        # Approval gate — mirrors email/password login behaviour
+        if not settings.DEBUG and not user.is_approved:
+            return Response(
+                {"detail": "Your account is pending admin approval. You will be notified once approved."},
+                status=403,
+            )
 
         # Issue SRA JWT tokens
         refresh = RefreshToken.for_user(user)

@@ -12,7 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-export default function GoogleAuthButton({ redirectTo = "/dashboard", label = "Continue with Google" }) {
+function GoogleAuthButtonInner({ redirectTo = "/dashboard", label = "Continue with Google" }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -57,8 +57,6 @@ export default function GoogleAuthButton({ redirectTo = "/dashboard", label = "C
     onError: () => setError("Google sign-in was cancelled or failed."),
   });
 
-  if (!CLIENT_ID) return null;
-
   return (
     <div>
       <button
@@ -87,4 +85,9 @@ export default function GoogleAuthButton({ redirectTo = "/dashboard", label = "C
       )}
     </div>
   );
+}
+
+export default function GoogleAuthButton(props) {
+  if (!CLIENT_ID) return null;
+  return <GoogleAuthButtonInner {...props} />;
 }

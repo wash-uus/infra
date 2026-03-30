@@ -36,6 +36,9 @@ import {
   rejectJoinRequest,
   adminSendMessage,
   adminBroadcast,
+  waBroadcast,
+  waStats,
+  waContacts,
 } from "../../api/dashboard";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -646,6 +649,13 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, initialPendingApprov
   const [broadcastText, setBroadcastText] = useState("");
   const [msgBusy, setMsgBusy] = useState(false);
 
+  // WhatsApp tab
+  const [waBroadcastText, setWaBroadcastText] = useState("");
+  const [waBroadcastType, setWaBroadcastType] = useState("general");
+  const [waBusy, setWaBusy] = useState(false);
+  const [waStatsData, setWaStatsData] = useState(null);
+  const [waStatsLoaded, setWaStatsLoaded] = useState(false);
+
   // Admins tab (super_admin only)
   const [admins, setAdmins] = useState([]);
   const [adminsLoaded, setAdminsLoaded] = useState(false);
@@ -706,6 +716,14 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, initialPendingApprov
     if (tab !== "audit" || auditLoaded) return;
     fetchAudit(1);
   }, [tab, auditLoaded, fetchAudit]);
+
+  // ── WhatsApp stats ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (tab !== "whatsapp" || waStatsLoaded) return;
+    waStats()
+      .then(r => { setWaStatsData(r.data); setWaStatsLoaded(true); })
+      .catch(() => showToast("Failed to load WhatsApp stats", true));
+  }, [tab, waStatsLoaded, showToast]);
 
   // ── User / admin action helpers ────────────────────────────────────────────
   const handlePromoteUser = (userId, role) => {
@@ -806,6 +824,7 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, initialPendingApprov
     { id: "users",     label: "Users" },
     { id: "joinreqs",  label: "Join Requests", badge: joinRequests.length },
     { id: "messaging", label: "Messaging" },
+    { id: "whatsapp",  label: "WhatsApp" },
     { id: "reviews",   label: "Reviews",  badge: reviews.length },
     { id: "appeals",   label: "Appeals",  badge: appeals.length },
     ...(isSuperAdmin ? [
@@ -1159,6 +1178,126 @@ function AdminView({ stats, isSuperAdmin, reviews, appeals, initialPendingApprov
               </div>
             </div>
           </Section>
+        </div>
+      )}
+
+      {/* ── WHATSAPP ─────────────────────────────────────────────────────── */}
+      {tab === "whatsapp" && (
+        <div className="space-y-5">
+          {/* Stats summary */}
+          {waStatsData && (
+            <Section title="WhatsApp Overview">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-400">{waStatsData.opted_in_total ?? 0}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Opted-in Contacts</p>
+                </div>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
+                  <p className="text-2xl font-bold text-zinc-200">{waStatsData.total_contacts ?? 0}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Total Contacts</p>
+                </div>
+                {waStatsData.last_30_days?.[0] && (
+                  <>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
+                      <p className="text-2xl font-bold text-amber-400">{waStatsData.last_30_days[0].delivery_rate?.toFixed(1) ?? "—"}%</p>
+                      <p className="text-xs text-zinc-500 mt-1">Delivery Rate (today)</p>
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-400">{waStatsData.last_30_days[0].read_rate?.toFixed(1) ?? "—"}%</p>
+                      <p className="text-xs text-zinc-500 mt-1">Read Rate (today)</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Section>
+          )}
+
+          {/* WhatsApp Broadcast */}
+          <Section title="WhatsApp Broadcast">
+            <p className="text-xs text-zinc-600 mb-4">
+              Send a WhatsApp message to all <strong className="text-emerald-400">{waStatsData?.opted_in_total ?? "…"} opted-in</strong> contacts. Messages are sent immediately via the WhatsApp Business API.
+            </p>
+            <div className="space-y-3">
+              <select
+                value={waBroadcastType}
+                onChange={e => setWaBroadcastType(e.target.value)}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-300 outline-none focus:border-emerald-500 transition-colors"
+              >
+                <option value="general">General</option>
+                <option value="revival_alert">Revival Alert</option>
+                <option value="new_content">New Content</option>
+                <option value="prayer_call">Prayer Call</option>
+                <option value="event">Event Announcement</option>
+              </select>
+              <textarea
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-emerald-500 transition-colors min-h-[140px] resize-y"
+                placeholder="Type your WhatsApp broadcast message… (supports *bold*, _italic_)"
+                value={waBroadcastText}
+                onChange={e => setWaBroadcastText(e.target.value)}
+                maxLength={4000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-700">{waBroadcastText.length}/4000</span>
+                <button
+                  disabled={!waBroadcastText.trim() || waBusy}
+                  onClick={() => showConfirm({
+                    title: "Send WhatsApp Broadcast",
+                    description: `This will send a WhatsApp message to all ${waStatsData?.opted_in_total ?? "opted-in"} contacts. This cannot be recalled.`,
+                    fn: async () => {
+                      setWaBusy(true);
+                      try {
+                        const res = await waBroadcast(waBroadcastText.trim(), waBroadcastType);
+                        showToast(`WhatsApp broadcast sent to ${res.data?.sent ?? "?"} contacts!`);
+                        setWaBroadcastText("");
+                        setWaStatsLoaded(false); // refresh stats
+                      } catch (e) {
+                        showToast(e?.response?.data?.detail ?? "WhatsApp broadcast failed", true);
+                      } finally { setWaBusy(false); }
+                    },
+                  })}
+                  className="rounded-lg bg-[#25D366] hover:bg-[#1da851] disabled:opacity-30 px-6 py-2.5 text-xs font-bold text-white transition-all flex items-center gap-2"
+                >
+                  {waBusy ? "Sending…" : "📱 Send WhatsApp Broadcast"}
+                </button>
+              </div>
+            </div>
+          </Section>
+
+          {/* 30-day metrics table */}
+          {waStatsData?.last_30_days?.length > 0 && (
+            <Section title="Last 30 Days — Delivery Metrics">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-zinc-400">
+                  <thead>
+                    <tr className="border-b border-zinc-800 text-zinc-500">
+                      <th className="py-2 text-left">Date</th>
+                      <th className="py-2 text-right">Sent</th>
+                      <th className="py-2 text-right">Delivered</th>
+                      <th className="py-2 text-right">Read</th>
+                      <th className="py-2 text-right">Delivery %</th>
+                      <th className="py-2 text-right">Read %</th>
+                      <th className="py-2 text-right">New Opt-ins</th>
+                      <th className="py-2 text-right">Opt-outs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waStatsData.last_30_days.map(row => (
+                      <tr key={row.date} className="border-b border-zinc-900 hover:bg-zinc-900/40">
+                        <td className="py-1.5 font-mono">{row.date}</td>
+                        <td className="py-1.5 text-right">{row.messages_sent}</td>
+                        <td className="py-1.5 text-right">{row.messages_delivered}</td>
+                        <td className="py-1.5 text-right">{row.messages_read}</td>
+                        <td className="py-1.5 text-right text-emerald-400">{row.delivery_rate?.toFixed(1)}%</td>
+                        <td className="py-1.5 text-right text-blue-400">{row.read_rate?.toFixed(1)}%</td>
+                        <td className="py-1.5 text-right text-green-400">+{row.new_opt_ins}</td>
+                        <td className="py-1.5 text-right text-red-400">-{row.opt_outs}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
         </div>
       )}
 

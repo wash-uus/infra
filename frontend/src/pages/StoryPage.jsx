@@ -2,13 +2,23 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import { getShortStoryById } from "../api/homeContent";
+import QuickShareStrip from "../components/QuickShareStrip";
 import ShareButton from "../components/ShareButton";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 export default function StoryPage() {
   const { id } = useParams();
   const [story, setStory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // Sets document.title + OG tag overrides when story loads (helps Google crawls + browser tabs)
+  usePageMeta({
+    title: story?.title,
+    description: story?.story ? story.story.slice(0, 160).trimEnd() : undefined,
+    ogUrl: story ? `https://spiritrevivalafrica.com/stories/${id}` : undefined,
+    ogImage: story?.photo_url || undefined,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +89,15 @@ export default function StoryPage() {
         </div>
         <p className="whitespace-pre-line text-base leading-relaxed text-zinc-300">{story.story}</p>
       </article>
+
+      <QuickShareStrip
+        url={`https://spiritrevivalafrica.com/stories/${id}`}
+        title={story.title}
+        excerpt={(story.story || "").slice(0, 120).trimEnd()}
+        contentType="story"
+        objectId={story.id}
+        className="mt-6"
+      />
     </section>
   );
 }

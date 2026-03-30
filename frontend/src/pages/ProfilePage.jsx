@@ -1,9 +1,23 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import DashLayout from "../components/dashboard/DashLayout";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import api, { resolveMediaUrl } from "../api/client";
 import { MINISTRY_AREA_LABELS } from "../schemas/signupSchemas";
+
+function profileCompletion(p) {
+  if (!p) return 0;
+  const checks = [
+    p.country, p.phone, p.gender, p.born_again,
+    p.church_name, Array.isArray(p.ministry_areas) && p.ministry_areas.length > 0,
+    p.testimony, p.why_join, p.unity_agreement,
+    p.statement_of_faith, p.code_of_conduct,
+    p.membership_type && p.membership_type !== "member",
+    p.profile_picture,
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
 
 function Toast({ msg, err }) {
   return (
@@ -116,6 +130,25 @@ export default function ProfilePage() {
         <div className="flex items-center justify-center h-48 text-zinc-600">Loading…</div>
       ) : (
         <div className="space-y-6 max-w-4xl">
+          {/* Profile completion nudge */}
+          {profileCompletion(data) < 100 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-300">
+                  Your profile is {profileCompletion(data)}% complete
+                </p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Add your location, ministry areas, testimony and more so the community can find you.
+                </p>
+              </div>
+              <Link
+                to="/profile/settings"
+                className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-black hover:bg-amber-400 transition-colors shrink-0"
+              >
+                Complete Profile
+              </Link>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
             <div className="flex items-center gap-4">
               {data.profile_picture ? (

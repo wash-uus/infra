@@ -74,6 +74,15 @@ class User(AbstractUser):
 
     profile_picture = models.ImageField(upload_to="profiles/", blank=True, null=True)
 
+    referred_by = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="referrals",
+        help_text="User who referred this account via a share link.",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
 

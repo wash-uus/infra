@@ -7,6 +7,7 @@ class PrayerRequest(models.Model):
         PENDING = "pending", "Pending Review"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
+        APPEALED = "appealed", "Under Appeal"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="prayer_requests")
     title = models.CharField(max_length=255)

@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsModeratorOrAbove
@@ -382,6 +383,8 @@ class ShortStorySubmitView(APIView):
     It goes into PENDING status; admin approves before it goes live.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "content_submit"
 
     def post(self, request):
         title = request.data.get("title", "").strip()
@@ -396,6 +399,18 @@ class ShortStorySubmitView(APIView):
             return Response({"detail": "Title must be at least 5 characters."}, status=400)
         if not story or len(story) < 50:
             return Response({"detail": "Story must be at least 50 characters."}, status=400)
+
+        # Magic byte validation — reject files that claim to be images but aren't
+        if photo:
+            if photo.size > 5 * 1024 * 1024:
+                return Response({"detail": "Image must be under 5 MB."}, status=400)
+            header = photo.read(12)
+            photo.seek(0)
+            is_jpeg = header[:3] == b"\xff\xd8\xff"
+            is_png  = header[:8] == b"\x89PNG\r\n\x1a\n"
+            is_webp = header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+            if not (is_jpeg or is_png or is_webp):
+                return Response({"detail": "Only JPEG, PNG, or WebP images are allowed."}, status=400)
 
         obj = ShortStory.objects.create(
             title=title,
@@ -491,7 +506,9 @@ class ShortStoryApproveView(APIView):
             self._notify_story(story, approved=True)
             return Response({"detail": "Story approved and is now live."})
         elif action_type == "reject":
-            reason = request.data.get("reason", "")
+            reason = request.data.get("reason", "").strip()
+            if not reason:
+                return Response({"detail": "A rejection_reason is required."}, status=400)
             story.status = ShortStory.Status.REJECTED
             story.rejection_reason = reason
             story.is_published = False
@@ -504,6 +521,68 @@ class ShortStoryApproveView(APIView):
         return Response({"detail": "Invalid action."}, status=400)
 
 
+class ShortStoryEditView(APIView):
+    """
+    PATCH /api/content/stories/<id>/edit/
+    Owner can edit their own PENDING or REJECTED story. Editing resets status to PENDING.
+    Approved stories are locked — return 403.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, story_id):
+        try:
+            story = ShortStory.objects.get(pk=story_id, submitter=request.user)
+        except ShortStory.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+
+        if story.status == ShortStory.Status.APPROVED:
+            return Response(
+                {"detail": "Approved stories are locked. Contact support to request an edit."},
+                status=403,
+            )
+
+        title = request.data.get("title", "").strip()
+        story_text = request.data.get("story", "").strip()
+        author_name = request.data.get("author_name", "").strip()
+        photo = request.FILES.get("photo")
+
+        if title and len(title) < 5:
+            return Response({"detail": "Title must be at least 5 characters."}, status=400)
+        if story_text and len(story_text) < 50:
+            return Response({"detail": "Story must be at least 50 characters."}, status=400)
+
+        update_fields = ["status", "reviewed_by", "reviewed_at", "rejection_reason"]
+        if title:
+            story.title = title
+            update_fields.append("title")
+        if story_text:
+            story.story = story_text
+            update_fields.append("story")
+        if author_name:
+            story.author_name = author_name
+            update_fields.append("author_name")
+        if photo:
+            if photo.size > 5 * 1024 * 1024:
+                return Response({"detail": "Image must be under 5 MB."}, status=400)
+            header = photo.read(12)
+            photo.seek(0)
+            is_jpeg = header[:3] == b"\xff\xd8\xff"
+            is_png  = header[:8] == b"\x89PNG\r\n\x1a\n"
+            is_webp = header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+            if not (is_jpeg or is_png or is_webp):
+                return Response({"detail": "Only JPEG, PNG, or WebP images are allowed."}, status=400)
+            story.photo = photo
+            update_fields.append("photo")
+
+        story.status = ShortStory.Status.PENDING
+        story.reviewed_by = None
+        story.reviewed_at = None
+        story.rejection_reason = ""
+        story.save(update_fields=update_fields)
+        log_action(request.user, "story.edit", "ShortStory", story.pk, detail=story.title)
+        return Response({"detail": "Story updated and returned to review.", "id": story.pk})
+
+
 class StoryShareView(APIView):
     """GET /api/content/stories/<id>/share/ — public share card data."""
     permission_classes = [permissions.AllowAny]
@@ -514,18 +593,25 @@ class StoryShareView(APIView):
         except ShortStory.DoesNotExist:
             return Response({"detail": "Not found."}, status=404)
         frontend_url = getattr(django_settings, "FRONTEND_URL", "https://spiritrevivalafrica.com")
+        story_url = f"{frontend_url}/stories/{story_id}"
+        hook = (story.story[:120].rstrip() + "…") if len(story.story) > 120 else story.story
         excerpt = (story.story[:200].rstrip() + "…") if len(story.story) > 200 else story.story
         photo_url = None
         if story.photo:
             photo_url = request.build_absolute_uri(story.photo.url)
+        cta_text = f"🔥 Join the movement → {frontend_url}"
         return Response({
-            "title": story.title,
+            "title": f"{story.title} — Spirit Revival Africa",
             "excerpt": excerpt,
-            "url": f"{frontend_url}/prayer",
+            "url": story_url,
+            "share_url": f"/stories/{story_id}",
             "photo_url": photo_url,
+            "cta": cta_text,
             "whatsapp_caption": (
-                f"✨ *{story.title}*\n\n{excerpt}\n\n"
-                f"Read more at Spirit Revival Africa: {frontend_url}"
+                f"✨ *{story.title}*\n\n"
+                f"{hook}\n\n"
+                f"{cta_text}\n"
+                f"Read the full story: {story_url}"
             ),
         })
 

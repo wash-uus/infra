@@ -38,6 +38,13 @@ export const adminSendMessage = (userId, text) =>
 export const adminBroadcast = (text) =>
   api.post("/accounts/admin/broadcast/", { text });
 
+// WhatsApp Automation
+export const waBroadcast = (message, broadcast_type = "general") =>
+  api.post("/whatsapp/broadcast/", { message, broadcast_type });
+export const waStats = () => api.get("/whatsapp/stats/");
+export const waContacts = (opted_in = true) =>
+  api.get("/whatsapp/contacts/", { params: { opted_in: opted_in ? "true" : "false" } });
+
 // Super Admin
 export const getSuperAdminStats = () => api.get("/accounts/superadmin/stats/");
 

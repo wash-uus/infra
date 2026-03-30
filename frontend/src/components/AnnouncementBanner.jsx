@@ -27,11 +27,23 @@ const STYLES = {
 export default function AnnouncementBanner() {
   const [items, setItems] = useState([]);
 
-  useEffect(() => {
+  const fetchAnnouncements = () => {
     api
       .get("/common/announcements/")
       .then((res) => setItems(res.data.results || []))
       .catch(() => {});
+  };
+
+  // Initial fetch
+  useEffect(fetchAnnouncements, []);
+
+  // Refetch when admin switches back to the tab after adding an announcement
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchAnnouncements();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   if (items.length === 0) return null;

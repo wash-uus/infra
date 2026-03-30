@@ -23,11 +23,12 @@ const DEFAULT_DESC =
   "Join Africa's growing interdenominational revival movement. Worship, prayer, discipleship, community groups and revival hubs — all in one place.";
 const SITE_NAME = "Spirit Revival Africa";
 
-export function usePageMeta({ title, description, ogImage } = {}) {
+export function usePageMeta({ title, description, ogImage, ogUrl } = {}) {
   useEffect(() => {
     const fullTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
     const desc = description || DEFAULT_DESC;
     const image = ogImage || "https://spiritrevivalafrica.com/og-image.png";
+    const url = ogUrl || "https://spiritrevivalafrica.com";
 
     // Title
     document.title = fullTitle;
@@ -53,13 +54,27 @@ export function usePageMeta({ title, description, ogImage } = {}) {
     setMeta('meta[property="og:title"]', fullTitle);
     setMeta('meta[property="og:description"]', desc);
     setMeta('meta[property="og:image"]', image);
+    setMeta('meta[property="og:url"]', url);
+    setMeta('meta[name="twitter:card"]', "summary_large_image");
     setMeta('meta[name="twitter:title"]', fullTitle);
     setMeta('meta[name="twitter:description"]', desc);
     setMeta('meta[name="twitter:image"]', image);
 
+    // Canonical link — update the existing tag from index.html or create one
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", url);
+
     // Reset on unmount
     return () => {
       document.title = DEFAULT_TITLE;
+      // Restore root canonical
+      const c = document.querySelector('link[rel="canonical"]');
+      if (c) c.setAttribute("href", "https://spiritrevivalafrica.com/");
     };
-  }, [title, description, ogImage]);
+  }, [title, description, ogImage, ogUrl]);
 }

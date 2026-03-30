@@ -23,6 +23,8 @@ urlpatterns = [
     path("api/discipleship/", include("apps.discipleship.urls")),
     path("api/hubs/", include("apps.hubs.urls")),
     path("api/worship/", include("apps.worship.urls")),
+    path("api/whatsapp/", include("apps.whatsapp.urls")),
+    path("api/analytics/", include("apps.analytics.urls")),
 ]
 
 if settings.DEBUG:

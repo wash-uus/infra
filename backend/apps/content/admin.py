@@ -40,7 +40,11 @@ class ContentItemAdmin(admin.ModelAdmin):
                 obj.photo.url,
             )
         return "No photo uploaded"
-
+    def save_model(self, request, obj, form, change):
+        """Admin-created content items are approved immediately and go live."""
+        if not change:  # new object
+            obj.approved = True
+        super().save_model(request, obj, form, change)
 
 # ── UserPhoto ─────────────────────────────────────────────────────────────────
 
@@ -84,7 +88,11 @@ class UserPhotoAdmin(admin.ModelAdmin):
     def reject_selected(self, request, queryset):
         updated = queryset.update(approved=False)
         self.message_user(request, f"{updated} photo(s) rejected.")
-
+    def save_model(self, request, obj, form, change):
+        """Admin-uploaded user photos are approved immediately."""
+        if not change:
+            obj.approved = True
+        super().save_model(request, obj, form, change)
 
 # ── FetchedPhoto ──────────────────────────────────────────────────────────────
 

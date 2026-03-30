@@ -10,6 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Explicitly load .env from the project root (backend/) so it works
 # regardless of the working directory Passenger sets at startup.
 load_dotenv(BASE_DIR / ".env")
+# Local dev overrides: .env.local values take precedence over .env
+load_dotenv(BASE_DIR / ".env.local", override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "insecure-dev-key")
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -46,9 +48,12 @@ INSTALLED_APPS = [
     "apps.discipleship",
     "apps.hubs",
     "apps.worship",
+    "apps.whatsapp",
+    "apps.analytics",
 ]
 
 MIDDLEWARE = [
+    "apps.accounts.middleware.SecurityHeadersMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # serve static files in production
@@ -57,6 +62,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.accounts.middleware.EnforceUserApprovalMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -165,6 +171,8 @@ REST_FRAMEWORK = {
         # Tighter per-IP limit for authentication endpoints
         "login": "10/min",
         "password_reset": "5/hour",
+        # Story and prayer submission abuse prevention
+        "content_submit": "5/hour",
     },
 }
 
@@ -206,6 +214,23 @@ CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 AT_USERNAME  = os.getenv("AT_USERNAME", "")    # 'sandbox' during testing, your real username in production
 AT_API_KEY   = os.getenv("AT_API_KEY",  "")    # from your AT dashboard
 AT_SENDER_ID = os.getenv("AT_SENDER_ID", "")   # optional alphanumeric sender e.g. 'SRA' (max 11 chars)
+
+# ── WhatsApp Automation ────────────────────────────────────────────────────
+# Set WHATSAPP_PROVIDER to 'twilio' (default) or 'meta' (Meta Cloud API)
+WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "twilio")
+# The public-facing business number shown in opt-in links (E.164, e.g. +14155238886)
+WHATSAPP_BUSINESS_NUMBER = os.getenv("WHATSAPP_BUSINESS_NUMBER", "")
+
+# Twilio WhatsApp credentials (https://console.twilio.com)
+TWILIO_ACCOUNT_SID  = os.getenv("TWILIO_ACCOUNT_SID",  "")
+TWILIO_AUTH_TOKEN   = os.getenv("TWILIO_AUTH_TOKEN",   "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # e.g. whatsapp:+14155238886
+
+# Meta Cloud API credentials (https://developers.facebook.com/apps)
+META_WHATSAPP_PHONE_NUMBER_ID = os.getenv("META_WHATSAPP_PHONE_NUMBER_ID", "")
+META_WHATSAPP_ACCESS_TOKEN    = os.getenv("META_WHATSAPP_ACCESS_TOKEN",    "")
+META_APP_SECRET               = os.getenv("META_APP_SECRET",               "")
+META_WEBHOOK_VERIFY_TOKEN     = os.getenv("META_WEBHOOK_VERIFY_TOKEN",     "")
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

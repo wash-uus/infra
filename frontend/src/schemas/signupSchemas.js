@@ -5,6 +5,11 @@ export const step1Schema = z
   .object({
     full_name: z.string().min(2, "Full name must be at least 2 characters").max(100),
     email: z.string().email("Enter a valid email address"),
+    username: z
+      .string()
+      .min(3, "Username must be at least 3 characters")
+      .max(30, "Username must be 30 characters or less")
+      .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -12,18 +17,6 @@ export const step1Schema = z
       .regex(/[a-z]/, "Must contain at least one lowercase letter")
       .regex(/[0-9]/, "Must contain at least one number")
       .regex(/[^A-Za-z0-9]/, "Must contain at least one special character"),
-    confirm_password: z.string().min(1, "Please confirm your password"),
-    country: z.string().min(1, "Please select your country"),
-    city: z.string().optional(),
-    phone: z
-      .string()
-      .optional()
-      .refine((v) => !v || /^\+?[\d\s\-()]{7,20}$/.test(v), "Invalid phone number format"),
-    gender: z.enum(["", "male", "female", "prefer_not_to_say"]).optional(),
-  })
-  .refine((data) => data.password === data.confirm_password, {
-    message: "Passwords do not match",
-    path: ["confirm_password"],
   });
 
 /* ── Step 2: Spiritual Background ────────────────────── */

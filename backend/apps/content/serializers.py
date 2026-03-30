@@ -227,6 +227,7 @@ class DailyBreadSerializer(serializers.ModelSerializer):
 class ShortStorySerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     submitter_name = serializers.SerializerMethodField()
+    share_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ShortStory
@@ -238,6 +239,7 @@ class ShortStorySerializer(serializers.ModelSerializer):
             "published_at",
             "photo",
             "photo_url",
+            "share_url",
             "status",
             "rejection_reason",
             "submitter_name",
@@ -257,6 +259,9 @@ class ShortStorySerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.photo.url)
         return obj.photo.url
+
+    def get_share_url(self, obj):
+        return f"/stories/{obj.id}"
 
     def get_submitter_name(self, obj):
         if obj.submitter:

@@ -55,7 +55,25 @@
     <lastmod>2026-03-29</lastmod>
   </url>
   <url>
+    <loc>https://spiritrevivalafrica.com/stories</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-03-30</lastmod>
+  </url>
+  <url>
+    <loc>https://spiritrevivalafrica.com/stories/submit</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <lastmod>2026-03-30</lastmod>
+  </url>
+  <url>
     <loc>https://spiritrevivalafrica.com/register</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+    <lastmod>2026-03-29</lastmod>
+  </url>
+  <url>
+    <loc>https://spiritrevivalafrica.com/stories/submit</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
     <lastmod>2026-03-29</lastmod>
