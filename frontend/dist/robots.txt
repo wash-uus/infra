@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Block API endpoints — saves crawl budget and reduces data exposure
+Disallow: /api/
+# Block auth-gated pages that redirect crawlers — wasted crawl budget
+Disallow: /messages
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /verify-email
+Disallow: /reset-password
+
+Sitemap: https://spiritrevivalafrica.com/sitemap.xml
