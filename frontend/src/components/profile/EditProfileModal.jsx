@@ -210,9 +210,16 @@ export default function EditProfileModal({ open, profile, onClose, onSaved }) {
       setFormData(effectiveData);
     } catch (err) {
       const data = err?.response?.data;
-      if (typeof data === "string") setApiError(data);
-      else if (data && typeof data === "object") setApiError(Object.values(data).flat().join(" "));
-      else setApiError("Failed to update profile.");
+      if (!data) { setApiError("Failed to update profile. Check your connection."); return; }
+      if (typeof data === "string") { setApiError(data); return; }
+      const msgs = [];
+      const extract = (v) => {
+        if (typeof v === "string") msgs.push(v);
+        else if (Array.isArray(v)) v.forEach(extract);
+        else if (v && typeof v === "object") Object.values(v).forEach(extract);
+      };
+      extract(data);
+      setApiError(msgs.join(" ") || "Failed to update profile.");
     } finally {
       setLoading(false);
     }
@@ -287,6 +294,8 @@ export default function EditProfileModal({ open, profile, onClose, onSaved }) {
               onSubmit={handleSubmit}
               loading={loading}
               apiError={apiError}
+              submitLabel="💾 Save / Update Profile"
+              loadingLabel="Saving…"
             />
           )}
         </div>
