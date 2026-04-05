@@ -1,0 +1,23 @@
+Options -MultiViews
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ── CORS at Apache level (handles preflight before Passenger/Django) ──────────
+<IfModule mod_headers.c>
+    SetEnvIf Origin "^https://(www\.)?spiritrevivalafrica\.com$" CORS_ALLOWED=1
+
+    # Only set headers when origin matches
+    Header always set Access-Control-Allow-Origin "https://spiritrevivalafrica.com" env=CORS_ALLOWED
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" env=CORS_ALLOWED
+    Header always set Access-Control-Allow-Headers "Accept, Authorization, Content-Type, X-CSRFToken, X-Requested-With" env=CORS_ALLOWED
+    Header always set Access-Control-Allow-Credentials "true" env=CORS_ALLOWED
+    Header always set Access-Control-Max-Age "86400" env=CORS_ALLOWED
+    Header always set Vary "Origin"
+</IfModule>
+
+# Return 200 for OPTIONS preflight requests immediately (don't hit Passenger)
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
