@@ -5,6 +5,18 @@ cPanel → Python App → App startup file = passenger_wsgi.py
 import os
 import sys
 
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
+
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
+
 # Make sure the backend directory is on the path so Django can find config/
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
