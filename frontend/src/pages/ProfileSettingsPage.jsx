@@ -84,7 +84,14 @@ function apiErrMsg(err) {
   const d = err?.response?.data;
   if (!d) return "Failed to save. Check your connection.";
   if (typeof d === "string") return d;
-  return Object.values(d).flat().join(" ") || "Failed to save.";
+  const msgs = [];
+  const extract = (v) => {
+    if (typeof v === "string") msgs.push(v);
+    else if (Array.isArray(v)) v.forEach(extract);
+    else if (v && typeof v === "object") Object.values(v).forEach(extract);
+  };
+  extract(d);
+  return msgs.join(" ") || "Failed to save.";
 }
 
 /* ── Section 1: Personal Info ───────────────────────────────────────────── */

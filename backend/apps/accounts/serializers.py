@@ -60,9 +60,13 @@ class UserSerializer(serializers.ModelSerializer):
         ministry = mutable.get("ministry_areas")
         if isinstance(ministry, str):
             try:
-                mutable["ministry_areas"] = json.loads(ministry)
+                parsed = json.loads(ministry)
             except json.JSONDecodeError:
-                mutable["ministry_areas"] = []
+                parsed = []
+            if hasattr(mutable, "setlist"):
+                mutable.setlist("ministry_areas", parsed)
+            else:
+                mutable["ministry_areas"] = parsed
         year = mutable.get("year_of_salvation")
         if isinstance(year, str) and not year.strip():
             mutable["year_of_salvation"] = None
