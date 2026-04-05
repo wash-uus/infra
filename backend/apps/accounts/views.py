@@ -840,7 +840,10 @@ class GoogleAuthView(APIView):
             logger.warning("Google userinfo error: %s", info)
             return Response({"detail": "Invalid or expired Google token."}, status=400)
 
-        if not info.get("verified_email"):
+        email_verified = info.get("email_verified")
+        if isinstance(email_verified, str):
+            email_verified = email_verified.lower() == "true"
+        if not email_verified:
             return Response({"detail": "Google email is not verified."}, status=400)
 
         # Use email from Google's verified userinfo; fall back only if needed.
