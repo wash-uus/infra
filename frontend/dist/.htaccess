@@ -19,6 +19,7 @@ RewriteRule ^ index.html [QSA,L]
     Header always set X-Frame-Options "DENY"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
 </IfModule>
 
 # Cache hashed static assets aggressively (Vite fingerprints filenames)
