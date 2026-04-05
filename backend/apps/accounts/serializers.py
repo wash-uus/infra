@@ -63,6 +63,9 @@ class UserSerializer(serializers.ModelSerializer):
                 mutable["ministry_areas"] = json.loads(ministry)
             except json.JSONDecodeError:
                 mutable["ministry_areas"] = []
+        year = mutable.get("year_of_salvation")
+        if isinstance(year, str) and not year.strip():
+            mutable["year_of_salvation"] = None
         return super().to_internal_value(mutable)
 
     def update(self, instance, validated_data):

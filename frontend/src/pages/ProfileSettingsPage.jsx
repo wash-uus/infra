@@ -108,8 +108,8 @@ function PersonalSection({ profile, onSaved, showToast }) {
   const handlePic = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("Image must be under 5 MB.", true);
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Image must be under 2 MB.", true);
       return;
     }
     setPicFile(file);
@@ -176,7 +176,7 @@ function PersonalSection({ profile, onSaved, showToast }) {
             >
               Change Photo
             </button>
-            <p className="mt-1.5 text-xs text-zinc-600">JPG, PNG or WebP · max 5 MB</p>
+            <p className="mt-1.5 text-xs text-zinc-600">JPG, PNG or WebP · max 2 MB</p>
             {picFile && (
               <p className="mt-1 text-xs text-amber-400 truncate max-w-[180px]">
                 {picFile.name}
