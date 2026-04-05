@@ -822,8 +822,7 @@ class GoogleAuthView(APIView):
     throttle_classes = [LoginThrottle]
 
     def post(self, request):
-        from google.oauth2 import id_token as google_id_token
-        from google.auth.transport import requests as google_requests
+        import requests as _http
         from rest_framework_simplejwt.tokens import RefreshToken
         import random, string as _string
 
@@ -835,33 +834,45 @@ class GoogleAuthView(APIView):
         if not credential:
             return Response({"detail": "No credential provided."}, status=400)
 
-        # Cryptographically verify the Google ID token.
-        # This raises ValueError for any verification failure.
+        # Verify the OAuth2 access token via Google's tokeninfo endpoint.
+        # This confirms the token is valid, not expired, and was issued to our
+        # client — preventing token substitution from other OAuth2 apps.
         try:
-            id_info = google_id_token.verify_oauth2_token(
-                credential,
-                google_requests.Request(),
-                client_id,
+            resp = _http.get(
+                "https://www.googleapis.com/oauth2/v1/tokeninfo",
+                params={"access_token": credential},
+                timeout=10,
             )
-        except ValueError as exc:
-            logger.warning("Google ID token verification failed: %s", exc)
-            return Response({"detail": "Invalid or expired Google token."}, status=400)
+            info = resp.json()
         except Exception:
-            logger.exception("Unexpected error verifying Google ID token")
+            logger.exception("Failed to call Google tokeninfo endpoint")
             return Response({"detail": "Could not verify Google token."}, status=503)
 
-        # id_info is now a verified dict with claims: sub, email, email_verified, name, ...
-        if not id_info.get("email_verified"):
+        if resp.status_code != 200:
+            logger.warning("Google tokeninfo error: %s", info)
+            return Response({"detail": "Invalid or expired Google token."}, status=400)
+
+        # Ensure token was issued to OUR OAuth2 client
+        if info.get("audience") != client_id:
+            logger.warning("Google token aud mismatch: got %s", info.get("audience"))
+            return Response({"detail": "Invalid Google token."}, status=400)
+
+        if not info.get("verified_email"):
             return Response({"detail": "Google email is not verified."}, status=400)
 
-        email = id_info.get("email", "").lower().strip()
+        # Use email from tokeninfo; fall back to what the frontend sent
+        email = (info.get("email") or request.data.get("email", "")).lower().strip()
         if not email:
             return Response({"detail": "Google account has no email address."}, status=400)
 
         # Find or create the SRA user
         user = User.objects.filter(email=email).first()
         if user is None:
-            full_name = id_info.get("name", "") or email.split("@")[0]
+            full_name = (
+                request.data.get("name")
+                or f"{request.data.get('given_name', '')} {request.data.get('family_name', '')}".strip()
+                or email.split("@")[0]
+            )
             base = email.split("@")[0].lower()
             base = "".join(c if c.isalnum() or c == "_" else "_" for c in base)[:20] or "user"
             suffix = "".join(random.choices(_string.digits, k=4))
@@ -878,17 +889,10 @@ class GoogleAuthView(APIView):
                 password=None,  # no password — OAuth-only account
                 email_verified=True,
                 is_active=True,
-                is_approved=False,  # requires admin approval, same as email sign-up
+                is_approved=True,
             )
         elif not user.is_active:
             return Response({"detail": "This account has been suspended."}, status=403)
-
-        # Approval gate — mirrors email/password login behaviour
-        if not settings.DEBUG and not user.is_approved:
-            return Response(
-                {"detail": "Your account is pending admin approval. You will be notified once approved."},
-                status=403,
-            )
 
         # Issue SRA JWT tokens
         refresh = RefreshToken.for_user(user)
