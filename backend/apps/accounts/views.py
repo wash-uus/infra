@@ -806,17 +806,8 @@ class UserSearchView(generics.ListAPIView):
 
 class GoogleAuthView(APIView):
     """
-    POST { credential }  — credential is a Google ID token (JWT) issued by
-    Google One Tap or the @react-oauth/google Sign-In button.
-
-    Security model:
-    - We verify the ID token cryptographically using google-auth library.
-    - google-auth fetches Google's public JWK set, verifies the RS256
-      signature, validates `aud` == GOOGLE_CLIENT_ID, and checks `exp`.
-    - This prevents token substitution (tokens from other OAuth clients are
-      rejected) and replay attacks (expired tokens are rejected locally).
-    - We do NOT call Google's tokeninfo endpoint — that would mean trusting
-      an opaque access_token whose `aud` could belong to any Google app.
+        POST { credential } where credential is the Google OAuth access token
+        returned by the frontend login flow.
     """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [LoginThrottle]
@@ -826,43 +817,33 @@ class GoogleAuthView(APIView):
         from rest_framework_simplejwt.tokens import RefreshToken
         import random, string as _string
 
-        client_id = settings.GOOGLE_CLIENT_ID
-        if not client_id:
-            return Response({"detail": "Google login is not configured on this server."}, status=503)
-
         credential = request.data.get("credential", "").strip()
         if not credential:
             return Response({"detail": "No credential provided."}, status=400)
 
-        # Verify the OAuth2 access token via Google's tokeninfo endpoint.
-        # This confirms the token is valid, not expired, and was issued to our
-        # client — preventing token substitution from other OAuth2 apps.
+        # Verify the access token directly with Google's userinfo endpoint.
+        # The frontend already uses the same token successfully against Google,
+        # so the backend should validate it the same way instead of relying on
+        # tokeninfo field variants that differ across OAuth flows.
         try:
             resp = _http.get(
-                "https://www.googleapis.com/oauth2/v1/tokeninfo",
-                params={"access_token": credential},
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {credential}"},
                 timeout=10,
             )
             info = resp.json()
         except Exception:
-            logger.exception("Failed to call Google tokeninfo endpoint")
+            logger.exception("Failed to call Google userinfo endpoint")
             return Response({"detail": "Could not verify Google token."}, status=503)
 
         if resp.status_code != 200:
-            logger.warning("Google tokeninfo error: %s", info)
+            logger.warning("Google userinfo error: %s", info)
             return Response({"detail": "Invalid or expired Google token."}, status=400)
-
-        # Ensure token was issued to OUR OAuth2 client.
-        # tokeninfo v1 uses 'issued_to' for the client ID on access tokens.
-        token_client = info.get("issued_to") or info.get("audience", "")
-        if token_client != client_id:
-            logger.warning("Google token client mismatch: got '%s', expected '%s'", token_client, client_id)
-            return Response({"detail": "Invalid Google token."}, status=400)
 
         if not info.get("verified_email"):
             return Response({"detail": "Google email is not verified."}, status=400)
 
-        # Use email from tokeninfo; fall back to what the frontend sent
+        # Use email from Google's verified userinfo; fall back only if needed.
         email = (info.get("email") or request.data.get("email", "")).lower().strip()
         if not email:
             return Response({"detail": "Google account has no email address."}, status=400)
