@@ -193,7 +193,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         user = User(**validated_data)
         user.set_password(password)
-        user.is_approved = False  # Requires admin approval after email verification
+        user.is_approved = True
         user.save()
         return user
 
@@ -208,10 +208,6 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not django_settings.DEBUG and not self.user.email_verified:
             raise serializers.ValidationError(
                 {"detail": "Please verify your email address before logging in. Check your inbox for the verification link."}
-            )
-        if not django_settings.DEBUG and not self.user.is_approved:
-            raise serializers.ValidationError(
-                {"detail": "Your account is pending admin approval. You will be notified once approved."}
             )
         return data
 

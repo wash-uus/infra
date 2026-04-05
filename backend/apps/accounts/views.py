@@ -94,7 +94,7 @@ def _send_welcome_notifications(user) -> None:
         return
     message = (
         f"Welcome to Spirit Revival Africa, {user.full_name or user.username}! "
-        "Account created. Please verify your email then await admin approval. "
+        "Account created. Please verify your email to get started. "
         "God bless you — SRA Team"
     )
     _send_sms(phone, message, log_label=f"WelcomeSMS user_id={user.id}")

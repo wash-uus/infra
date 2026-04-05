@@ -51,7 +51,7 @@ class EnforceUserApprovalMiddleware:
     def __call__(self, request):
         user = getattr(request, "user", None)
         if user and user.is_authenticated:
-            if not user.is_active or not user.is_approved:
+            if not user.is_active:
                 from django.http import JsonResponse
                 return JsonResponse(
                     {"detail": "Account not authorized."},
