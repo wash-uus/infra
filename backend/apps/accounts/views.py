@@ -852,9 +852,11 @@ class GoogleAuthView(APIView):
             logger.warning("Google tokeninfo error: %s", info)
             return Response({"detail": "Invalid or expired Google token."}, status=400)
 
-        # Ensure token was issued to OUR OAuth2 client
-        if info.get("audience") != client_id:
-            logger.warning("Google token aud mismatch: got %s", info.get("audience"))
+        # Ensure token was issued to OUR OAuth2 client.
+        # tokeninfo v1 uses 'issued_to' for the client ID on access tokens.
+        token_client = info.get("issued_to") or info.get("audience", "")
+        if token_client != client_id:
+            logger.warning("Google token client mismatch: got '%s', expected '%s'", token_client, client_id)
             return Response({"detail": "Invalid Google token."}, status=400)
 
         if not info.get("verified_email"):

@@ -35,6 +35,8 @@ class SecurityHeadersMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         response.setdefault("Content-Security-Policy", self.CSP)
+        # Allow Google OAuth popup to post message back to opener window.
+        response.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
         return response
 
 
