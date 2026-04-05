@@ -2,7 +2,9 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import HeroSection from "../components/hero/HeroSection";
 import { getHomeFeed, getTrending } from "../api/homeContent";
+import { getGallery } from "../api/gallery";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import QuickShareStrip from "../components/QuickShareStrip";
 
 const features = [
   { icon: "�", title: "Prayer Network", description: "Lift your voice with intercessors across Africa. Submit requests, agree in faith, and witness answered prayer.", link: "/prayer" },
@@ -11,6 +13,123 @@ const features = [
   { icon: "🎓", title: "Discipleship Courses", description: "Grow deeper in your walk with structured courses and lessons designed for every believer.", link: "/discipleship" },
 ];
 
+
+// Extract YouTube video ID from any YouTube URL
+function getYouTubeId(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function GalleryPreviewSection() {
+  const [photos, setPhotos] = useState([]);
+  useEffect(() => {
+    getGallery("photo")
+      .then(({ data }) => setPhotos((data?.results || []).slice(0, 6)))
+      .catch(() => {});
+  }, []);
+  if (!photos.length) return null;
+  return (
+    <section className="mx-auto max-w-7xl px-6 pb-24">
+      <div className="mb-10 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Gallery</p>
+        <h2 className="text-3xl font-black text-white sm:text-4xl">Moments of Revival</h2>
+        <p className="mt-3 text-zinc-400">Captured from our community — worship, prayer, and life in the Spirit.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {photos.map((item) => (
+          <Link
+            key={item.id}
+            to="/gallery"
+            className="group relative overflow-hidden rounded-xl bg-zinc-900"
+            style={{ aspectRatio: "1" }}
+          >
+            <img
+              src={item.image_url}
+              alt={item.title || "Revival moment"}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            {item.title && (
+              <p className="absolute bottom-0 left-0 right-0 px-3 pb-3 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 line-clamp-1">
+                {item.title}
+              </p>
+            )}
+          </Link>
+        ))}
+      </div>
+      <div className="mt-8 text-center">
+        <Link to="/gallery" className="btn-outline px-8 py-2.5 text-sm rounded-xl">
+          See All Photos &amp; Videos →
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function VideosPreviewSection() {
+  const [videos, setVideos] = useState([]);
+  useEffect(() => {
+    getGallery("video")
+      .then(({ data }) => setVideos((data?.results || []).slice(0, 4)))
+      .catch(() => {});
+  }, []);
+  if (!videos.length) return null;
+  return (
+    <section className="mx-auto max-w-7xl px-6 pb-24">
+      <div className="mb-10 text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">Videos</p>
+        <h2 className="text-3xl font-black text-white sm:text-4xl">Watch the Movement</h2>
+        <p className="mt-3 text-zinc-400">Sermons, testimonies and worship sessions from across Africa.</p>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        {videos.map((item) => {
+          const ytId = getYouTubeId(item.video_url || item.video_file_url || "");
+          const thumb = item.thumbnail_url || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null);
+          return (
+            <Link
+              key={item.id}
+              to="/gallery"
+              className="group overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/30 transition"
+            >
+              <div className="relative overflow-hidden" style={{ aspectRatio: "16/9" }}>
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt={item.title || "Video"}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                    <span className="text-5xl">🎬</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-colors">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-lg transition-transform group-hover:scale-110">
+                    <svg className="h-6 w-6 text-black ml-1" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4">
+                <p className="font-bold text-white line-clamp-1">{item.title}</p>
+                {item.caption && (
+                  <p className="mt-1 text-xs text-zinc-500 line-clamp-2">{item.caption}</p>
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+      <div className="mt-8 text-center">
+        <Link to="/gallery" className="btn-outline px-8 py-2.5 text-sm rounded-xl">
+          Watch More Videos →
+        </Link>
+      </div>
+    </section>
+  );
+}
 
 function TrendingSection() {
   const [items, setItems] = useState([]);
@@ -238,6 +357,19 @@ export default function HomePage() {
             </p>
           ) : null}
         </div>
+
+        {/* Share strip — only shown when there is an active daily bread */}
+        {dailyBread && (
+          <div className="relative z-10 pb-6 px-6">
+            <QuickShareStrip
+              url="https://spiritrevivalafrica.com"
+              title={`Daily Bread — ${dailyBread.verse_reference}`}
+              excerpt={`"${(dailyBread.verse_text || "").slice(0, 120).trimEnd()}" — ${dailyBread.verse_reference} (${dailyBread.bible_version})`}
+              contentType="daily_bread"
+              objectId={dailyBread.id ?? 0}
+            />
+          </div>
+        )}
       </section>
 
       {/* SHORT STORIES */}
@@ -377,6 +509,12 @@ export default function HomePage() {
           </article>
         </div>
       ) : null}
+
+      {/* GALLERY PREVIEW */}
+      <GalleryPreviewSection />
+
+      {/* VIDEOS PREVIEW */}
+      <VideosPreviewSection />
 
       {/* TRENDING NOW */}
       <TrendingSection />

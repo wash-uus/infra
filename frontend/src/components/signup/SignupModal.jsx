@@ -92,7 +92,9 @@ export default function SignupModal({ open, onClose }) {
         if (typeof data === "string") {
           setApiError(data);
         } else if (data.email) {
-          setApiError("This email is already registered. Please sign in or use a different email.");
+          onClose();
+          navigate("/login", { state: { emailExists: true } });
+          return;
         } else if (data.password) {
           setApiError(Array.isArray(data.password) ? data.password.join(" ") : data.password);
         } else if (data.username) {

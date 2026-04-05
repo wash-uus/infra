@@ -21,6 +21,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const emailExists = location.state?.emailExists || false;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -67,6 +68,13 @@ export default function LoginPage() {
             Back to Home
           </Link>
         </div>
+
+        {/* Email-already-exists notice */}
+        {emailExists && (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300 text-center">
+            That email is already registered — sign in below.
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-8 text-center">

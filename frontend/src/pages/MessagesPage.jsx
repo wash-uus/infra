@@ -5,6 +5,7 @@ import api from "../api/client";
 import messaging from "../api/messaging";
 import { useAuth } from "../context/AuthContext";
 import useMessagePolling from "../hooks/useMessagePolling";
+import EmojiPicker from "../components/EmojiPicker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL = 4000; // ms between polls (4 s)
@@ -148,6 +149,8 @@ function DirectTab({ isAuthenticated }) {
   const [unreadMap, setUnreadMap] = useState({}); // partnerId → unread count
   const bottomRef = useRef(null);
   const searchDebounce = useRef(null);
+  const directInputRef = useRef(null);
+  const [showEmojiDirect, setShowEmojiDirect] = useState(false);
 
   // ── Load conversation list ──────────────────────────────────────────────
   useEffect(() => {
@@ -447,9 +450,47 @@ function DirectTab({ isAuthenticated }) {
               </div>
 
               <form onSubmit={send}
-                className="flex gap-2 border-t border-zinc-800 p-4 bg-zinc-950/60">
-                <input value={text} onChange={(e) => setText(e.target.value)}
-                  placeholder="Type a message…" className="input-dark flex-1" />
+                className="relative flex gap-2 border-t border-zinc-800 p-4 bg-zinc-950/60">
+                {showEmojiDirect && (
+                  <EmojiPicker
+                    onSelect={(emoji) => {
+                      const input = directInputRef.current;
+                      if (input) {
+                        const start = input.selectionStart ?? text.length;
+                        const end = input.selectionEnd ?? text.length;
+                        const next = text.slice(0, start) + emoji + text.slice(end);
+                        setText(next);
+                        // Restore cursor after emoji
+                        requestAnimationFrame(() => {
+                          input.focus();
+                          input.setSelectionRange(start + emoji.length, start + emoji.length);
+                        });
+                      } else {
+                        setText((t) => t + emoji);
+                      }
+                    }}
+                    onClose={() => setShowEmojiDirect(false)}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiDirect((v) => !v)}
+                  className={`shrink-0 rounded-xl p-2.5 text-xl transition
+                              ${showEmojiDirect
+                                ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
+                                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"}`}
+                  title="Emoji"
+                >
+                  😊
+                </button>
+                <input
+                  ref={directInputRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onFocus={() => setShowEmojiDirect(false)}
+                  placeholder="Type a message…"
+                  className="input-dark flex-1"
+                />
                 <button type="submit" disabled={sending || !text.trim()}
                   className="btn-gold py-2.5 px-5 text-sm disabled:opacity-50">
                   {sending ? "…" : "Send"}
@@ -481,6 +522,8 @@ function GroupsTab({ isAuthenticated }) {
   const [pollActive, setPollActive] = useState(false);
   const [toast, setToast] = useState(null);
   const bottomRef = useRef(null);
+  const groupInputRef = useRef(null);
+  const [showEmojiGroup, setShowEmojiGroup] = useState(false);
 
   // Load groups
   useEffect(() => {
@@ -669,9 +712,46 @@ function GroupsTab({ isAuthenticated }) {
               </div>
 
               <form onSubmit={send}
-                className="flex gap-2 border-t border-zinc-800 p-4 bg-zinc-950/60">
-                <input value={text} onChange={(e) => setText(e.target.value)}
-                  placeholder={`Message ${selected.name}…`} className="input-dark flex-1" />
+                className="relative flex gap-2 border-t border-zinc-800 p-4 bg-zinc-950/60">
+                {showEmojiGroup && (
+                  <EmojiPicker
+                    onSelect={(emoji) => {
+                      const input = groupInputRef.current;
+                      if (input) {
+                        const start = input.selectionStart ?? text.length;
+                        const end = input.selectionEnd ?? text.length;
+                        const next = text.slice(0, start) + emoji + text.slice(end);
+                        setText(next);
+                        requestAnimationFrame(() => {
+                          input.focus();
+                          input.setSelectionRange(start + emoji.length, start + emoji.length);
+                        });
+                      } else {
+                        setText((t) => t + emoji);
+                      }
+                    }}
+                    onClose={() => setShowEmojiGroup(false)}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiGroup((v) => !v)}
+                  className={`shrink-0 rounded-xl p-2.5 text-xl transition
+                              ${showEmojiGroup
+                                ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
+                                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"}`}
+                  title="Emoji"
+                >
+                  😊
+                </button>
+                <input
+                  ref={groupInputRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onFocus={() => setShowEmojiGroup(false)}
+                  placeholder={`Message ${selected.name}…`}
+                  className="input-dark flex-1"
+                />
                 <button type="submit" disabled={sending || !text.trim()}
                   className="btn-gold py-2.5 px-5 text-sm disabled:opacity-50">
                   {sending ? "…" : "Send"}

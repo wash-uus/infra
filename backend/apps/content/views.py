@@ -617,6 +617,51 @@ class StoryShareView(APIView):
 
 
 
+class DailyBreadShareView(APIView):
+    """GET /api/content/daily-bread/share/ — public share card for today's Daily Bread."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        today = timezone.now().date()
+        try:
+            bread = (
+                DailyBread.objects.filter(is_active=True, display_date__lte=today)
+                .order_by("-display_date")
+                .first()
+            )
+            if not bread:
+                return Response({"detail": "No Daily Bread available."}, status=404)
+        except DailyBread.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://spiritrevivalafrica.com")
+        photo_url = None
+        if bread.photo:
+            photo_url = request.build_absolute_uri(bread.photo.url)
+
+        verse = bread.verse_text or ""
+        hook = (verse[:160].rstrip() + "…") if len(verse) > 160 else verse
+        excerpt = (
+            f'"{hook}" — {bread.verse_reference} ({bread.bible_version})'
+        )
+        reflection_line = f"\n\n💭 {bread.reflection.strip()}" if bread.reflection else ""
+        whatsapp_caption = (
+            f"📖 *Daily Bread — Spirit Revival Africa*\n\n"
+            f"_{bread.verse_reference} ({bread.bible_version})_\n\n"
+            f'"{hook}"'
+            f"{reflection_line}\n\n"
+            f"👉 Join the movement:\n{frontend_url}"
+        )
+        return Response({
+            "title": f"Daily Bread — {bread.verse_reference}",
+            "excerpt": excerpt,
+            "url": frontend_url,
+            "photo_url": photo_url,
+            "cta": f"🔥 Join the movement → {frontend_url}",
+            "whatsapp_caption": whatsapp_caption,
+        })
+
+
 class GalleryPublicListView(APIView):
     permission_classes = [permissions.AllowAny]
 
