@@ -1,0 +1,509 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// INFRA Platform — Prisma Schema (Cloud SQL PostgreSQL)
+//
+// Design principles:
+//   • Firebase UID is the primary identity key on the `users` table.
+//   • Firebase Auth handles authentication; this schema owns structured data.
+//   • Firestore owns real-time messaging and notification feeds only.
+//   • All tables carry audit fields (createdAt, updatedAt) and soft-delete.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+  // Output to node_modules for standard resolution; override in multi-package
+  // setups with: output = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  // At runtime this is overridden by DATABASE_URL from Secret Manager.
+  // For Cloud SQL via Unix socket: "postgresql://user:pass@localhost/dbname?host=/cloudsql/PROJECT:REGION:INSTANCE"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CLIENT
+  PROFESSIONAL
+  VENDOR
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  ELITE
+  UNLIMITED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ProjectStatus {
+  DRAFT
+  POSTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ContractStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PaymentStatus {
+  PENDING
+  ESCROWED
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+enum FileCategory {
+  PROFILE_PHOTO
+  PROJECT_FILE
+  IDENTITY_DOC
+  CERTIFICATION
+  CONTRACT_ATTACHMENT
+}
+
+enum AdminActionType {
+  USER_WARNED
+  USER_SUSPENDED
+  USER_BANNED
+  USER_RESTORED
+  USER_ID_VERIFIED
+  PROJECT_REMOVED
+  REVIEW_REMOVED
+  BID_REMOVED
+  REPORT_RESOLVED
+  REPORT_DISMISSED
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE
+  FRAUD
+  HARASSMENT
+  FAKE_REVIEW
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  /// The Firebase UID — primary key, sourced from Firebase Auth.
+  id                String           @id @db.VarChar(128)
+  email             String           @unique @db.VarChar(320)
+  displayName       String           @db.VarChar(120)
+  role              UserRole         @default(CLIENT)
+  subscriptionTier  SubscriptionTier @default(FREE)
+  subscriptionExpiresAt DateTime?
+  isSuspended       Boolean          @default(false)
+  isEmailVerified   Boolean          @default(false)
+  fcmToken          String?          @db.VarChar(512)
+  lastSignInAt      DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  profile           Profile?
+  projectsPosted    Project[]        @relation("ProjectPoster")
+  bids              Bid[]
+  contractsAsClient Contract[]       @relation("ContractClient")
+  contractsAsPro    Contract[]       @relation("ContractProfessional")
+  reviewsGiven      Review[]         @relation("ReviewAuthor")
+  reviewsReceived   Review[]         @relation("ReviewSubject")
+  notifications     Notification[]
+  uploads           FileUpload[]
+  reportsSubmitted  Report[]         @relation("ReportSubmitter")
+  adminLogs         AdminLog[]       @relation("AdminActor")
+  adminLogTargets   AdminLog[]       @relation("AdminTarget")
+  savedProjects     SavedProject[]
+  professionalMatches ProjectMatch[]  @relation("MatchedProfessional")
+
+  @@index([email])
+  @@index([role])
+  @@index([subscriptionTier])
+  @@map("users")
+}
+
+model Profile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique @db.VarChar(128)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phoneNumber        String?            @db.VarChar(20)
+  bio                String?            @db.Text
+  country            String?            @db.Char(2)           // ISO 3166-1 alpha-2
+  city               String?            @db.VarChar(100)
+  timezone           String?            @db.VarChar(60)
+  photoUrl           String?            @db.VarChar(2048)
+
+  // Professional-specific
+  companyName        String?            @db.VarChar(200)
+  jobTitle           String?            @db.VarChar(150)
+  yearsExperience    Int?
+  hourlyRate         Decimal?           @db.Decimal(10, 2)
+  currency           String             @default("USD") @db.Char(3)
+  availabilityStatus String             @default("available") @db.VarChar(30)
+  disciplines        String[]
+  specialties        String[]
+  linkedinUrl        String?            @db.VarChar(2048)
+  portfolioUrl       String?            @db.VarChar(2048)
+
+  // Trust metrics (denormalized from reviews for fast reads)
+  averageRating      Decimal            @default(0) @db.Decimal(3, 2)
+  reviewCount        Int                @default(0)
+  completedJobCount  Int                @default(0)
+
+  // Identity verification
+  idVerified        Boolean            @default(false)
+  idVerificationStatus VerificationStatus @default(PENDING)
+  idVerifiedAt      DateTime?
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([country])
+  @@index([availabilityStatus])
+  @@index([averageRating])
+  @@map("profiles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECTS (formerly "Jobs" in the domain)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id               String        @id @default(cuid())
+  posterId         String        @db.VarChar(128)
+  poster           User          @relation("ProjectPoster", fields: [posterId], references: [id])
+
+  title            String        @db.VarChar(300)
+  description      String        @db.Text
+  category         String        @db.VarChar(80)
+  disciplineId     String?       @db.VarChar(80)
+  status           ProjectStatus @default(POSTED)
+
+  // Location
+  country          String        @db.Char(2)
+  city             String?       @db.VarChar(100)
+  isRemote         Boolean       @default(false)
+
+  // Budget
+  budgetMin        Decimal?      @db.Decimal(14, 2)
+  budgetMax        Decimal?      @db.Decimal(14, 2)
+  currency         String        @default("USD") @db.Char(3)
+
+  // Visibility / ranking
+  isFeatured       Boolean       @default(false)
+  featuredUntil    DateTime?
+  viewsCount       Int           @default(0)
+  bidsCount        Int           @default(0)          // denormalized
+
+  // Deadline
+  deadline         DateTime?
+  expiresAt        DateTime?
+
+  // Soft delete
+  deletedAt        DateTime?
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  bids             Bid[]
+  contract         Contract?
+  attachments      FileUpload[]
+  savedBy          SavedProject[]
+  reports          Report[]
+  matches          ProjectMatch[]
+
+  @@index([posterId])
+  @@index([status])
+  @@index([category])
+  @@index([country])
+  @@index([isFeatured])
+  @@index([createdAt(sort: Desc)])
+  @@index([deletedAt])
+  @@map("projects")
+}
+
+model SavedProject {
+  userId    String   @db.VarChar(128)
+  projectId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, projectId])
+  @@map("saved_projects")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIDS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Bid {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bidderId    String    @db.VarChar(128)
+  bidder      User      @relation(fields: [bidderId], references: [id])
+
+  amount      Decimal   @db.Decimal(14, 2)
+  currency    String    @default("USD") @db.Char(3)
+  coverNote   String    @db.Text
+  deliveryDays Int
+  status      BidStatus @default(PENDING)
+
+  // If accepted, contract is created linking back to this bid
+  contract    Contract?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([projectId, bidderId])           // one bid per professional per project
+  @@index([projectId])
+  @@index([bidderId])
+  @@index([status])
+  @@map("bids")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTRACTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Contract {
+  id               String         @id @default(cuid())
+  projectId        String         @unique
+  project          Project        @relation(fields: [projectId], references: [id])
+  bidId            String         @unique
+  bid              Bid            @relation(fields: [bidId], references: [id])
+
+  clientId         String         @db.VarChar(128)
+  client           User           @relation("ContractClient", fields: [clientId], references: [id])
+  professionalId   String         @db.VarChar(128)
+  professional     User           @relation("ContractProfessional", fields: [professionalId], references: [id])
+
+  status           ContractStatus @default(ACTIVE)
+  agreedAmount     Decimal        @db.Decimal(14, 2)
+  currency         String         @default("USD") @db.Char(3)
+
+  // Escrow
+  paymentStatus    PaymentStatus  @default(PENDING)
+  escrowedAt       DateTime?
+  releasedAt       DateTime?
+  stripePaymentIntentId String?   @db.VarChar(200)
+  mpesaCheckoutRequestId String? @db.VarChar(200)
+
+  startedAt        DateTime?
+  dueAt            DateTime?
+  completedAt      DateTime?
+
+  // Terms agreed
+  termsAgreedAt    DateTime       @default(now())
+
+  review           Review?
+  attachments      FileUpload[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([clientId])
+  @@index([professionalId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("contracts")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Review {
+  id           String   @id @default(cuid())
+  contractId   String   @unique
+  contract     Contract @relation(fields: [contractId], references: [id])
+  authorId     String   @db.VarChar(128)
+  author       User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  subjectId    String   @db.VarChar(128)
+  subject      User     @relation("ReviewSubject", fields: [subjectId], references: [id])
+
+  rating       Int      @db.SmallInt                // 1–5
+  comment      String   @db.Text
+  isPublic     Boolean  @default(true)
+
+  // Flag/moderation
+  isFlagged    Boolean  @default(false)
+  flagReason   String?  @db.VarChar(300)
+  removedAt    DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([subjectId])
+  @@index([authorId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS (durable / non-real-time; real-time feed lives in Firestore)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @db.VarChar(128)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String   @db.VarChar(60)
+  title     String   @db.VarChar(200)
+  body      String   @db.VarChar(500)
+  // JSON payload — extra context for deep links, action buttons, etc.
+  data      Json     @default("{}")
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE UPLOADS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FileUpload {
+  id           String       @id @default(cuid())
+  uploaderId   String       @db.VarChar(128)
+  uploader     User         @relation(fields: [uploaderId], references: [id])
+
+  // GCS path: gs://bucket/path/to/file.pdf
+  gcsPath      String       @db.VarChar(2048)
+  publicUrl    String?      @db.VarChar(2048)
+  fileName     String       @db.VarChar(255)
+  mimeType     String       @db.VarChar(100)
+  sizeBytes    Int
+  category     FileCategory
+
+  // Optional parent associations
+  projectId    String?
+  project      Project?     @relation(fields: [projectId], references: [id])
+  contractId   String?
+  contract     Contract?    @relation(fields: [contractId], references: [id])
+
+  createdAt    DateTime     @default(now())
+
+  @@index([uploaderId])
+  @@index([projectId])
+  @@index([contractId])
+  @@map("file_uploads")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORTS (user-submitted abuse reports for moderation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Report {
+  id           String       @id @default(cuid())
+  submitterId  String       @db.VarChar(128)
+  submitter    User         @relation("ReportSubmitter", fields: [submitterId], references: [id])
+
+  reason       ReportReason
+  details      String?      @db.Text
+  isResolved   Boolean      @default(false)
+  resolvedAt   DateTime?
+  resolution   String?      @db.VarChar(500)
+
+  // Polymorphic target — one of these is set
+  targetProjectId String?
+  targetProject   Project? @relation(fields: [targetProjectId], references: [id])
+
+  createdAt    DateTime     @default(now())
+
+  adminLog     AdminLog?
+
+  @@index([isResolved])
+  @@index([submitterId])
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN LOGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AdminLog {
+  id         String          @id @default(cuid())
+  actorId    String          @db.VarChar(128)
+  actor      User            @relation("AdminActor", fields: [actorId], references: [id])
+
+  targetId   String?         @db.VarChar(128)
+  target     User?           @relation("AdminTarget", fields: [targetId], references: [id])
+
+  action     AdminActionType
+  reason     String          @db.VarChar(500)
+  metadata   Json            @default("{}")
+
+  reportId   String?         @unique
+  report     Report?         @relation(fields: [reportId], references: [id])
+
+  createdAt  DateTime        @default(now())
+
+  @@index([actorId])
+  @@index([targetId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECT MATCHES (matching engine output — scored per project–professional pair)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProjectMatch {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  professionalId  String   @db.VarChar(128)
+  professional    User     @relation("MatchedProfessional", fields: [professionalId], references: [id])
+
+  /// 0–100 composite match score
+  score           Float
+
+  /// Breakdown of individual scoring factors (stored for explainability)
+  breakdown       Json
+
+  notified        Boolean  @default(false)
+  notifiedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, professionalId])
+  @@index([projectId, score(sort: Desc)])
+  @@index([professionalId])
+  @@map("project_matches")
+}

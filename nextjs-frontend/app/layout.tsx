@@ -5,19 +5,20 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import ToasterClient from '@/components/ToasterClient';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://infrasells.com';
-const OG_IMAGE = `${SITE_URL}/og-image.png`;
+const LOGO_URL = `${SITE_URL}/infrasells-logo.jpeg`;
+const OG_IMAGE = LOGO_URL;
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'INFRA — Engineering Professionals Platform',
-    template: '%s | INFRA',
+    default: 'InfraSells — Engineering Professionals Platform',
+    template: '%s | InfraSells',
   },
   description: 'Find and hire verified engineering professionals across Africa. Post jobs, list tools, and connect with top talent.',
   keywords: ['engineering jobs', 'Africa', 'construction', 'infrastructure', 'professionals', 'hire engineers'],
-  authors: [{ name: 'INFRA' }],
-  creator: 'INFRA',
-  publisher: 'INFRA',
+  authors: [{ name: 'InfraSells' }],
+  creator: 'InfraSells',
+  publisher: 'InfraSells',
   manifest: '/manifest.json',
   themeColor: '#059669',
   colorScheme: 'light',
@@ -26,29 +27,47 @@ export const metadata = {
     type: 'website',
     locale: 'en_US',
     url: SITE_URL,
-    siteName: 'INFRA',
-    title: 'INFRA — Engineering Professionals Platform',
+    siteName: 'InfraSells',
+    title: 'InfraSells — Engineering Professionals Platform',
     description: 'Find and hire verified engineering professionals across Africa.',
-    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: 'INFRA Platform' }],
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: 'InfraSells Platform' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'INFRA — Engineering Professionals Platform',
+    title: 'InfraSells — Engineering Professionals Platform',
     description: 'Find and hire verified engineering professionals across Africa.',
     images: [OG_IMAGE],
-    creator: '@infraafrica',
+    creator: '@infrasells',
   },
   robots: {
     index: true,
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
+  icons: {
+    icon: [{ url: '/infrasells-logo.jpeg', type: 'image/jpeg' }],
+    apple: [{ url: '/infrasells-logo.jpeg', type: 'image/jpeg' }],
+    shortcut: '/infrasells-logo.jpeg',
+  },
+};
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'InfraSells',
+  url: SITE_URL,
+  logo: LOGO_URL,
+  sameAs: ['https://twitter.com/infrasells'],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <QueryProvider>
           <AuthProvider>
             {children}

@@ -1,0 +1,128 @@
+@layer utilities {
+  @keyframes gradient-mesh {
+    0%, 100% {
+      transform: scale(1) translateY(0px) translateX(0px);
+    }
+    25% {
+      transform: scale(1.04) translateY(-10px) translateX(10px);
+    }
+    50% {
+      transform: scale(1.02) translateY(10px) translateX(-10px);
+    }
+    75% {
+      transform: scale(1.03) translateY(-8px) translateX(8px);
+    }
+  }
+  .animate-gradient-mesh {
+    animation: gradient-mesh 18s ease-in-out infinite alternate;
+  }
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --infra-primary:    #0B1F3A;
+    --infra-secondary:  #F97316;
+    --infra-neutral:    #1F2937;
+    --infra-background: #F9FAFB;
+    --infra-accent:     #EAB308;
+    --infra-success:    #16A34A;
+    --infra-error:      #DC2626;
+  }
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  * {
+    @apply border-gray-200;
+  }
+  body {
+    background-color: #F9FAFB;
+    color: #1F2937;
+    @apply antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-semibold text-infra-primary;
+  }
+  a {
+    @apply text-infra-primary transition-colors duration-200 hover:text-infra-secondary;
+  }
+  ::selection {
+    background-color: #0B1F3A;
+    color: #fff;
+  }
+  /* Premium thin scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-300;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  /* Glass card */
+  .glass-card {
+    @apply rounded-2xl border border-white/20 bg-white/80 shadow-glass backdrop-blur-xl;
+  }
+  /* Section divider */
+  .section-divider {
+    @apply border-t border-gray-100;
+  }
+  /* Gradient text using infra brand colors */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, var(--infra-primary) 0%, var(--infra-secondary) 100%);
+  }
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.4) 50%, transparent 75%);
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+  /* Tier badge utilities */
+  .tier-free  { @apply bg-gray-100 text-gray-500 ring-1 ring-gray-200; }
+  .tier-pro   { @apply bg-infra-primary text-white ring-1 ring-infra-primary/20; }
+  .tier-elite { @apply bg-infra-accent text-black ring-1 ring-infra-accent/30 shadow-glow-gold; }
+  /* Featured listing highlight */
+  .listing-featured { @apply border-infra-secondary shadow-glow-orange; }
+  /* Elite listing highlight */
+  .listing-elite    { @apply border-infra-accent shadow-glow-gold; }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  /* Stagger children animations */
+  .stagger-children > * {
+    opacity: 0;
+    animation: slideUp 0.5s ease-out forwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 80ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 160ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 240ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 320ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 400ms; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}

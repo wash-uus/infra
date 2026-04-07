@@ -1,0 +1,415 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# INFRA Platform — Local Development Environment
+#
+# Usage:
+#   docker-compose up                    # Start all services
+#   docker-compose up nodejs-backend     # Start only backend
+#   docker-compose up -d                 # Detached mode
+#   docker-compose down -v               # Stop + remove volumes
+#   docker-compose logs -f nodejs-backend # Tail logs
+#
+# One-time setup:
+#   cp nodejs-backend/.env.example nodejs-backend/.env   # Fill in Firebase creds
+#   docker-compose up postgres redis                      # Start infra first
+#   docker-compose run --rm nodejs-backend npm run prisma:migrate  # Seeds SQL DB
+#   docker-compose up                                     # Start everything
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.9'
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  infrasells-net:
+    driver: bridge
+
+# ── Named volumes (data persistence across restarts) ────────────────────────
+volumes:
+  postgres-data:
+  redis-data:
+  pgadmin-data:
+
+# ── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ── PostgreSQL (Cloud SQL replacement for local dev) ──────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: infrasells-postgres
+    restart: unless-stopped
+    networks: [infrasells-net]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/seed/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER:     infra
+      POSTGRES_PASSWORD: infralocal
+      POSTGRES_DB:       infradb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infra -d infradb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis (Upstash replacement for local dev) ─────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: infrasells-redis
+    restart: unless-stopped
+    networks: [infrasells-net]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Main Node.js Backend (port 8000) ─────────────────────────────────────
+  nodejs-backend:
+    build:
+      context: ./nodejs-backend
+      dockerfile: Dockerfile
+      target: builder          # Use builder stage in dev for faster rebuilds
+    container_name: infrasells-backend
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./nodejs-backend/.env
+    environment:
+      NODE_ENV:       development
+      PORT:           "8000"
+      DATABASE_URL:   postgresql://infra:infralocal@postgres:5432/infradb
+      REDIS_URL:      redis://redis:6379
+      MPESA_ENV:      sandbox
+      PAYPAL_MODE:    sandbox
+      # Stripe runs in test mode — use Stripe CLI for webhook forwarding
+      # stripe listen --forward-to localhost:8000/api/subscriptions/stripe/webhook
+    volumes:
+      # Live reload: mount source in dev (removed in production image)
+      - ./nodejs-backend/src:/app/src:ro
+      - ./nodejs-backend/prisma:/app/prisma:ro
+    command: npm run dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Messaging Service (port 8001) ─────────────────────────────────────────
+  messaging-service:
+    build:
+      context: ./services/messaging-service
+      dockerfile: Dockerfile
+    container_name: infrasells-messaging
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8001:8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/messaging-service/.env
+    environment:
+      NODE_ENV:  development
+      PORT:      "8001"
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Payments Service (port 8002) ──────────────────────────────────────────
+  payments-service:
+    build:
+      context: ./services/payments-service
+      dockerfile: Dockerfile
+    container_name: infrasells-payments
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8002:8002"
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/payments-service/.env
+    environment:
+      NODE_ENV:   development
+      PORT:       "8002"
+      REDIS_URL:  redis://redis:6379
+      MPESA_ENV:  sandbox
+      PAYPAL_MODE: sandbox
+      # Set STRIPE_WEBHOOK_SECRET to your Stripe CLI webhook secret when testing:
+      # stripe listen --forward-to localhost:8002/webhooks/stripe
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Next.js Frontend (port 3000) ──────────────────────────────────────────
+  nextjs-frontend:
+    build:
+      context: ./nextjs-frontend
+      dockerfile: Dockerfile
+    container_name: infrasells-frontend
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "3000:3000"
+    depends_on:
+      nodejs-backend:
+        condition: service_healthy
+    env_file:
+      - ./nextjs-frontend/.env.local
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:8001
+
+  # ── Users Service (port 8003) ─────────────────────────────────────────────
+  users-service:
+    build:
+      context: .
+      dockerfile: services/users-service/Dockerfile
+    container_name: infrasells-users
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/users-service/.env
+    environment:
+      NODE_ENV:     development
+      PORT:         "8003"
+      DATABASE_URL: postgresql://infra:infralocal@postgres:5432/infradb
+      REDIS_URL:    redis://redis:6379
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8003/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Jobs Service (port 8004) ──────────────────────────────────────────────
+  jobs-service:
+    build:
+      context: .
+      dockerfile: services/jobs-service/Dockerfile
+    container_name: infrasells-jobs
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/jobs-service/.env
+    environment:
+      NODE_ENV:     development
+      PORT:         "8004"
+      DATABASE_URL: postgresql://infra:infralocal@postgres:5432/infradb
+      REDIS_URL:    redis://redis:6379
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8004/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Project Service (port 8005) ───────────────────────────────────────────
+  project-service:
+    build:
+      context: .
+      dockerfile: services/project-service/Dockerfile
+    container_name: infrasells-project
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./services/project-service/.env
+    environment:
+      NODE_ENV:     development
+      PORT:         "8005"
+      DATABASE_URL: postgresql://infra:infralocal@postgres:5432/infradb
+      REDIS_URL:    redis://redis:6379
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8005/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Notifications Service (port 8006) ─────────────────────────────────────
+  notifications-service:
+    build:
+      context: ./services/notifications-service
+      dockerfile: Dockerfile
+    container_name: infrasells-notifications
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8006:8006"
+    env_file:
+      - ./services/notifications-service/.env
+    environment:
+      NODE_ENV: development
+      PORT:     "8006"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8006/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Reviews Service (port 8007) ───────────────────────────────────────────
+  reviews-service:
+    build:
+      context: ./services/reviews-service
+      dockerfile: Dockerfile
+    container_name: infrasells-reviews
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8007:8007"
+    env_file:
+      - ./services/reviews-service/.env
+    environment:
+      NODE_ENV: development
+      PORT:     "8007"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8007/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Search Service (port 8008) ────────────────────────────────────────────
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: infrasells-search
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8008:8008"
+    env_file:
+      - ./services/search-service/.env
+    environment:
+      NODE_ENV: development
+      PORT:     "8008"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8008/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Subscriptions Service (port 8009) ─────────────────────────────────────
+  subscriptions-service:
+    build:
+      context: ./services/subscriptions-service
+      dockerfile: Dockerfile
+    container_name: infrasells-subscriptions
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8009:8009"
+    env_file:
+      - ./services/subscriptions-service/.env
+    environment:
+      NODE_ENV: development
+      PORT:     "8009"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8009/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Tools Service (port 8010) ─────────────────────────────────────────────
+  tools-service:
+    build:
+      context: ./services/tools-service
+      dockerfile: Dockerfile
+    container_name: infrasells-tools
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8010:8010"
+    env_file:
+      - ./services/tools-service/.env
+    environment:
+      NODE_ENV: development
+      PORT:     "8010"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8010/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── PgAdmin (optional DB inspector UI, port 5050) ─────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: infrasells-pgadmin
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@infra.local
+      PGADMIN_DEFAULT_PASSWORD: adminlocal
+    depends_on:
+      - postgres
+    profiles:
+      - tools          # Only starts when: docker-compose --profile tools up
+
+  # ── Redis Commander (optional cache inspector, port 8081) ─────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: infrasells-redis-commander
+    restart: unless-stopped
+    networks: [infrasells-net]
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+    profiles:
+      - tools          # Only starts when: docker-compose --profile tools up

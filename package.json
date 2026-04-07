@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "name": "infra-platform",
+  "version": "0.0.0",
+  "description": "INFRA Platform monorepo root"
+}

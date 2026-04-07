@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
+    "types": ["node"],
+    "paths": {
+      "@prisma/client": ["../../nodejs-backend/node_modules/@prisma/client"]
+    },
+    "typeRoots": ["../../nodejs-backend/node_modules/@types"]
+  },
+  "include": ["./**/*"],
+  "exclude": ["node_modules"]
+}

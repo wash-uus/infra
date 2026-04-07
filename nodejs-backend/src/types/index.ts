@@ -46,7 +46,14 @@ export type NotificationType =
   | 'application'
   | 'connection'
   | 'review'
-  | 'system';
+  | 'system'
+  | 'referral'
+  | 'dispute_raised'
+  | 'dispute_resolved'
+  | 'badge_approved'
+  | 'badge_denied'
+  | 'reengagement'
+  | 'win_back';
 
 export type ConnectionStatus = 'pending' | 'accepted' | 'rejected' | 'blocked';
 export type ContactType = 'phone' | 'whatsapp' | 'email';
@@ -270,6 +277,7 @@ export interface Tool {
   ownerId: string;
   ownerName: string;
   ownerPhoto?: string;
+  ownerTier?: string;
   isAvailable: boolean;
   isFeatured: boolean;
   isVerified: boolean;

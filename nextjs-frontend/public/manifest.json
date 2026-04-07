@@ -1,6 +1,6 @@
 {
-  "name": "INFRA — Engineering Professionals Platform",
-  "short_name": "INFRA",
+  "name": "InfraSells — Engineering Professionals Platform",
+  "short_name": "InfraSells",
   "description": "Find and hire verified engineering professionals across Africa.",
   "start_url": "/",
   "display": "standalone",
@@ -14,15 +14,15 @@
       "type": "image/x-icon"
     },
     {
-      "src": "/icon-192.png",
+      "src": "/infrasells-logo.jpeg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/infrasells-logo.jpeg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ],

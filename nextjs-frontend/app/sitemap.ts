@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { generateAllSlugs } from '@/lib/seo-slugs';
 import { generateHireSlugs, generateJobSearchSlugs, generateToolBrowseSlugs } from '@/config/seoMatrix';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://infra.co.ke';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://infrasells.com';
 const API_URL  = process.env.NEXT_PUBLIC_API_URL  ?? 'http://localhost:8000/api';
 
 // ── Static pages ──────────────────────────────────────────────────────────────

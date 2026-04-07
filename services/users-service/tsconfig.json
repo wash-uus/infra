@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "strict": true,
+    "declaration": false,
+    "sourceMap": false,
+    "outDir": "dist",
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
+    "paths": {
+      "@infra/shared-types": ["../../packages/shared-types/dist/index.d.ts"],
+      "@infra/shared-utils": ["../../packages/shared-utils/dist/index.d.ts"],
+      "@infra/firebase-admin": ["../../packages/firebase-admin/dist/index.d.ts"],
+      "@prisma/client": ["../../nodejs-backend/node_modules/@prisma/client"],
+      "ioredis": ["../../nodejs-backend/node_modules/ioredis"],
+      "@google-cloud/pubsub": ["../../nodejs-backend/node_modules/@google-cloud/pubsub"],
+      "firebase-admin": ["../../nodejs-backend/node_modules/firebase-admin"],
+      "firebase-admin/*": ["../../nodejs-backend/node_modules/firebase-admin/*"],
+      "express": ["../../nodejs-backend/node_modules/@types/express/index.d.ts"],
+      "helmet": ["../../nodejs-backend/node_modules/helmet"],
+      "zod": ["../../nodejs-backend/node_modules/zod"],
+      "cors": ["../../nodejs-backend/node_modules/@types/cors/index.d.ts"],
+      "compression": ["../../nodejs-backend/node_modules/@types/compression/index.d.ts"],
+      "hpp": ["../../nodejs-backend/node_modules/@types/hpp/index.d.ts"],
+      "dotenv": ["../../nodejs-backend/node_modules/dotenv"],
+      "express-async-handler": ["../../nodejs-backend/node_modules/express-async-handler"],
+      "express-rate-limit": ["../../nodejs-backend/node_modules/express-rate-limit"],
+      "rate-limit-redis": ["../../nodejs-backend/node_modules/rate-limit-redis"],
+      "@sentry/node": ["../../nodejs-backend/node_modules/@sentry/node/build/types/index.d.ts"],
+      "@sentry/node/*": ["../../nodejs-backend/node_modules/@sentry/node/build/types/*"]
+    },
+    "typeRoots": ["../../nodejs-backend/node_modules/@types"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

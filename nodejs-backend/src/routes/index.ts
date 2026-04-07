@@ -1,0 +1,42 @@
+import { Router } from 'express';
+import usersRoutes from './users';
+import jobsRoutes from './jobs';
+import toolsRoutes from './tools';
+import transactionsRoutes from './transactions';
+import reviewsRoutes from './reviews';
+import messagingRoutes from './messaging';
+import notificationsRoutes from './notifications';
+import communicationsRoutes from './communications';
+import searchRoutes from './search';
+import subscriptionsRoutes from './subscriptions';
+import adminRoutes from './admin';
+import uploadsRoutes from './uploads';
+import configRoutes from './config';
+import growthRoutes from './growth';
+import revenueRoutes from './revenue';
+import matchingRoutes from './matching';
+import disputesRoutes from './disputes';
+import trustRoutes from './trust';
+
+const router = Router();
+
+router.use('/users', usersRoutes);
+router.use('/jobs', jobsRoutes);
+router.use('/tools', toolsRoutes);
+router.use('/transactions', transactionsRoutes);
+router.use('/reviews', reviewsRoutes);
+router.use('/messaging', messagingRoutes);
+router.use('/notifications', notificationsRoutes);
+router.use('/comms', communicationsRoutes);
+router.use('/search', searchRoutes);
+router.use('/subscriptions', subscriptionsRoutes);
+router.use('/admin', adminRoutes);
+router.use('/uploads', uploadsRoutes);
+router.use('/config', configRoutes);
+router.use('/growth', growthRoutes);
+router.use('/revenue', revenueRoutes);
+router.use('/matching', matchingRoutes);
+router.use('/disputes', disputesRoutes);
+router.use('/trust', trustRoutes);
+
+export default router;

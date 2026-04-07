@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { col, storage, db } from '../config/firebase';
 import { AuthRequest, Job, JobApplication } from '../types';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { v4 as uuidv4 } from 'uuid';
 import { enqueueNotification } from '../queues/notifications.queue';
 import { cached, invalidate, invalidatePattern } from '../utils/cache';
@@ -15,6 +15,7 @@ import { initiateStkPush } from '../services/mpesa';
 import { publish } from '../events/publisher';
 import { Topics } from '../events/topics';
 import { logger } from '../utils/logger';
+import { scoreApplication } from '../utils/matchScoring';
 
 // ── List jobs ─────────────────────────────────────────────────────────────────
 export const listJobs = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -68,6 +69,10 @@ export const listJobs = asyncHandler(async (req: AuthRequest, res: Response) => 
     return { data: jobs, hasMore: jobs.length === limit, nextCursor: jobs.length === limit ? jobs[jobs.length - 1]?.id : undefined };
   });
 
+  // Public CDN caching — safe when no auth header (unauthenticated browse)
+  if (!req.headers.authorization) {
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+  }
   res.json({ success: true, ...result });
 });
 
@@ -273,7 +278,7 @@ export const deleteJob = asyncHandler(async (req: AuthRequest, res: Response) =>
 export const uploadJobImage = asyncHandler(async (req: AuthRequest, res: Response) => {
   const uid = req.user!.uid;
   const { id } = req.params;
-  if (!req.file) throw new Error('No file uploaded');
+  if (!req.file) throw new BadRequestError('No file uploaded');
   validateImageUpload(req.file);
 
   const doc = await col.jobs.doc(id).get();
@@ -330,17 +335,10 @@ export const applyToJob = asyncHandler(async (req: AuthRequest, res: Response) =
   const job = jobDoc.data() as Job;
   if (job.postedBy === uid) throw new ForbiddenError('Cannot apply to your own job');
 
-  // Check for duplicate application
-  const existing = await col.jobApplications
-    .where('jobId', '==', id)
-    .where('applicantId', '==', uid)
-    .limit(1)
-    .get();
-  if (!existing.empty) throw new Error('You have already applied to this job');
-
   const userData = userDoc.data();
 
-  // Enforce daily application limits
+  // Enforce daily application limits (outside transaction — quota race window is
+  // at most 1 extra application, which is acceptable vs. the cost of a counter txn)
   const tier = getEffectiveTier(userData ?? {});
   const dailyLimit = DAILY_APPLICATION_LIMITS[tier] ?? 5;
   const appliedDateKey = new Date().toISOString().slice(0, 10);
@@ -368,7 +366,10 @@ export const applyToJob = asyncHandler(async (req: AuthRequest, res: Response) =
     }
   }
 
-  const appId = uuidv4();
+  // Use a deterministic composite ID so that concurrent duplicate requests
+  // converge on the same document path and the Firestore transaction's
+  // existence-check closes the TOCTOU race atomically.
+  const appId = `${uid}_${id}`;
   const now = FieldValue.serverTimestamp();
 
   const application: Omit<JobApplication, 'id'> = {
@@ -386,10 +387,22 @@ export const applyToJob = asyncHandler(async (req: AuthRequest, res: Response) =
     updatedAt: now as any,
   };
 
-  await Promise.all([
-    col.jobApplications.doc(appId).set(application),
-    col.jobs.doc(id).update({ applicationsCount: FieldValue.increment(1) }),
-  ]);
+  // Atomic check-then-write: the transaction prevents two concurrent requests
+  // from both passing the duplicate check before either commits.
+  const alreadyApplied = await db.runTransaction(async (txn) => {
+    const existingSnap = await txn.get(col.jobApplications.doc(appId));
+    if (existingSnap.exists) return true;
+    txn.set(col.jobApplications.doc(appId), application);
+    txn.update(col.jobs.doc(id), { applicationsCount: FieldValue.increment(1) });
+    return false;
+  });
+
+  if (alreadyApplied) throw new BadRequestError('You have already applied to this job');
+
+  // Compute AI match score asynchronously — does not block the response
+  scoreApplication(appId, userData ?? {}, job, db).catch((err) =>
+    logger.warn('Match scoring failed for application', { appId, jobId: id, error: err?.message }),
+  );
 
   // Remaining quota for today
   const usedAfter = (todayApps?.size ?? 0) + 1;
@@ -518,6 +531,17 @@ export const updateApplicationStatus = asyncHandler(async (req: AuthRequest, res
     });
   }
 
+  // Decrement applicationsCount when an applicant withdraws so the job's
+  // displayed count stays in sync with actual active applications.
+  if (status === 'withdrawn') {
+    col.jobs.doc(app.jobId).update({
+      applicationsCount: FieldValue.increment(-1),
+      updatedAt: FieldValue.serverTimestamp(),
+    }).catch(() => {});
+    // Invalidate the jobs cache so the decremented count is visible immediately.
+    invalidate(`jobs:get:${app.jobId}`).catch(() => {});
+  }
+
   // Notify applicant of status change (not on self-withdrawal)
   if (isJobOwner && app.applicantId !== uid) {
     const statusLabel = status === 'accepted' ? 'accepted' : status === 'rejected' ? 'rejected' : status;
@@ -547,6 +571,7 @@ export const toggleBookmark = asyncHandler(async (req: AuthRequest, res: Respons
   if (!existing.empty) {
     await existing.docs[0].ref.delete();
     await col.jobs.doc(id).update({ bookmarksCount: FieldValue.increment(-1) });
+    invalidate(`jobs:get:${id}`).catch(() => {});
     res.json({ success: true, bookmarked: false });
     return;
   }
@@ -559,6 +584,7 @@ export const toggleBookmark = asyncHandler(async (req: AuthRequest, res: Respons
     createdAt: FieldValue.serverTimestamp(),
   });
   await col.jobs.doc(id).update({ bookmarksCount: FieldValue.increment(1) });
+  invalidate(`jobs:get:${id}`).catch(() => {});
   res.json({ success: true, bookmarked: true });
 });
 
@@ -663,7 +689,29 @@ export const unlockApplicant = asyncHandler(async (req: AuthRequest, res: Respon
   if (!appDoc.exists) throw new NotFoundError('Application');
 
   const price = MICROTRANSACTION_PRICES.applicantUnlock;
-  const microId = uuidv4();
+  // Deterministic ID: concurrent requests converge on the same document instead
+  // of initiating multiple STK pushes for the same unlock operation.
+  const microId = `unlk_${uid}_${appId}`;
+
+  // Idempotency: if a pending/completed microtransaction already exists, return it
+  // instead of issuing a duplicate STK push.
+  const existingMicro = await col.microtransactions.doc(microId).get();
+  if (existingMicro.exists) {
+    const em = existingMicro.data() as any;
+    if (em.status !== 'failed') {
+      res.json({
+        success: true,
+        data: {
+          microtransactionId: microId,
+          checkoutRequestId: em.mpesaCheckoutRequestId,
+          status: em.status,
+          amountKES: em.amountKES,
+          label: price.label,
+        },
+      });
+      return;
+    }
+  }
   const now = FieldValue.serverTimestamp();
 
   const micro = {
@@ -724,7 +772,28 @@ export const boostApplication = asyncHandler(async (req: AuthRequest, res: Respo
   }
 
   const price = MICROTRANSACTION_PRICES.applicationBoost;
-  const microId = uuidv4();
+  // Deterministic ID: concurrent boost requests converge, preventing duplicate STK pushes.
+  const microId = `boost_${uid}_${appId}`;
+
+  // Idempotency: return existing pending/completed microtransaction rather than
+  // issuing a second STK push.
+  const existingMicro = await col.microtransactions.doc(microId).get();
+  if (existingMicro.exists) {
+    const em = existingMicro.data() as any;
+    if (em.status !== 'failed') {
+      res.json({
+        success: true,
+        data: {
+          microtransactionId: microId,
+          checkoutRequestId: em.mpesaCheckoutRequestId,
+          status: em.status,
+          amountKES: em.amountKES,
+          label: price.label,
+        },
+      });
+      return;
+    }
+  }
   const now = FieldValue.serverTimestamp();
 
   const micro = {
